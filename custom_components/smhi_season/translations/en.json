@@ -2,9 +2,27 @@
     "config": {
         "step": {
             "user": {
-                "description": "Välj sensorn som visar utomhustemperatur.",
+                "description": "Konfigurera meteorologisk årstid. Historiska datum är frivilliga.",
                 "data": {
-                    "temperature_sensor": "Temperatursensor"
+                    "temperature_sensor": "Temperatursensor (Utomhus)",
+                    "history_spring": "Förra årets Vår (Datum)",
+                    "history_summer": "Förra årets Sommar (Datum)",
+                    "history_autumn": "Förra årets Höst (Datum)",
+                    "history_winter": "Förra årets Vinter (Datum)"
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "description": "Ändra inställningar för årstider.",
+                "data": {
+                    "temperature_sensor": "Temperatursensor (Utomhus)",
+                    "history_spring": "Förra årets Vår (Datum)",
+                    "history_summer": "Förra årets Sommar (Datum)",
+                    "history_autumn": "Förra årets Höst (Datum)",
+                    "history_winter": "Förra årets Vinter (Datum)"
                 }
             }
         }
