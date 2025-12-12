@@ -1,4 +1,4 @@
-<img src="brand.png" width="150" align="left" alt="Logo">
+<img src="custom_components/brand.png" width="150" align="left" alt="Logo">
 # Meteorologisk Årstid (SMHI) for Home Assistant
 
 A custom integration that calculates the meteorological season based on SMHI (Swedish Meteorological and Hydrological Institute) definitions.
