@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import date
 
 import voluptuous as vol
 
@@ -34,7 +35,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the initial step."""
+        errors = {}
+
         if user_input is not None:
+            # Validate dates are not in the future
+            if not self._validate_dates(user_input, errors):
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=self._get_schema(user_input),
+                    errors=errors,
+                )
+
             return self.async_create_entry(
                 title="Meteorologisk Årstid", data=user_input
             )
@@ -42,7 +53,26 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=self._get_schema(),
+            errors=errors,
         )
+
+    def _validate_dates(self, user_input, errors):
+        """Check if any provided date is in the future."""
+        today = date.today()
+        date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
+        
+        for key in date_keys:
+            if input_date_str := user_input.get(key):
+                # Selector returns specific format, but verify object type if needed
+                # Usually selector returns str 'YYYY-MM-DD'
+                try:
+                    input_date = date.fromisoformat(str(input_date_str))
+                    if input_date > today:
+                        errors["base"] = "cannot_be_future"
+                        return False
+                except ValueError:
+                    pass
+        return True
 
     def _get_schema(self, defaults=None):
         """Reusable schema for setup and options."""
@@ -61,48 +91,64 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
         )
 
+
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for SMHI Season."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        # We do not set self.config_entry here because it is a read-only property 
-        # in the base class. The base class will automatically populate self.config_entry 
-        # when the flow starts.
         pass
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
+        errors = {}
+        
         if user_input is not None:
+            # Validate dates are not in the future
+            if not self._validate_dates(user_input, errors):
+                # Re-show form with errors
+                # Re-build schema with user input to keep their bad selection visible
+                schema = self._build_schema(user_input)
+                return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+
             return self.async_create_entry(title="", data=user_input)
 
-        # Merge data and options to show current values as defaults
-        # self.config_entry is available here automatically via the base class
+        # Default Schema Load
         current_config = {**self.config_entry.data, **self.config_entry.options}
+        schema = self._build_schema(current_config)
         
-        # We need to access the schema builder from the ConfigFlow class
-        # or recreate it. For simplicity, we recreate the schema logic here 
-        # or instantiate the ConfigFlow temporarily (but that's messy).
-        # Best practice: Just define the schema here or make the method static in ConfigFlow.
-        
-        # Let's use the static helper we added to ConfigFlow (requires a small tweak above)
-        # OR just duplicate the simple schema here to avoid class complexity issues.
-        
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_TEMPERATURE_SENSOR, default=current_config.get(CONF_TEMPERATURE_SENSOR)): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-                ),
-                vol.Optional(CONF_HISTORY_SPRING, default=current_config.get(CONF_HISTORY_SPRING)): selector.DateSelector(),
-                vol.Optional(CONF_HISTORY_SUMMER, default=current_config.get(CONF_HISTORY_SUMMER)): selector.DateSelector(),
-                vol.Optional(CONF_HISTORY_AUTUMN, default=current_config.get(CONF_HISTORY_AUTUMN)): selector.DateSelector(),
-                vol.Optional(CONF_HISTORY_WINTER, default=current_config.get(CONF_HISTORY_WINTER)): selector.DateSelector(),
-            }
-        )
-
         return self.async_show_form(
             step_id="init",
             data_schema=schema,
+        )
+
+    def _validate_dates(self, user_input, errors):
+        """Check if any provided date is in the future."""
+        today = date.today()
+        date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
+        
+        for key in date_keys:
+            if input_date_str := user_input.get(key):
+                try:
+                    input_date = date.fromisoformat(str(input_date_str))
+                    if input_date > today:
+                        errors["base"] = "cannot_be_future"
+                        return False
+                except ValueError:
+                    pass
+        return True
+
+    def _build_schema(self, defaults):
+        """Build schema with defaults."""
+        return vol.Schema(
+            {
+                vol.Required(CONF_TEMPERATURE_SENSOR, default=defaults.get(CONF_TEMPERATURE_SENSOR)): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+                ),
+                vol.Optional(CONF_HISTORY_SPRING, default=defaults.get(CONF_HISTORY_SPRING)): selector.DateSelector(),
+                vol.Optional(CONF_HISTORY_SUMMER, default=defaults.get(CONF_HISTORY_SUMMER)): selector.DateSelector(),
+                vol.Optional(CONF_HISTORY_AUTUMN, default=defaults.get(CONF_HISTORY_AUTUMN)): selector.DateSelector(),
+                vol.Optional(CONF_HISTORY_WINTER, default=defaults.get(CONF_HISTORY_WINTER)): selector.DateSelector(),
+            }
         )

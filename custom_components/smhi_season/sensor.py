@@ -7,7 +7,7 @@ import statistics
 
 from homeassistant.components.sensor import SensorEntity, RestoreSensor
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_change
 
@@ -34,21 +34,40 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensor platform."""
     
-    # Merge data (original setup) and options (changes made via Configure)
     config = {**entry.data, **entry.options}
-    
     temp_sensor_id = config.get(CONF_TEMPERATURE_SENSOR)
     
-    # Extract historical dates if provided
-    manual_history = {
+    # Initialize sensors
+    history_sensor = SmhiHistorySensor(entry.entry_id)
+    main_sensor = SmhiSeasonSensor(hass, entry.entry_id, temp_sensor_id, history_sensor)
+
+    # --- PROCESS MANUAL DATES ---
+    current_year = date.today().year
+    
+    # Map config keys to season constants
+    date_map = {
         SEASON_SPRING: config.get(CONF_HISTORY_SPRING),
         SEASON_SUMMER: config.get(CONF_HISTORY_SUMMER),
         SEASON_AUTUMN: config.get(CONF_HISTORY_AUTUMN),
         SEASON_WINTER: config.get(CONF_HISTORY_WINTER),
     }
-    
-    history_sensor = SmhiHistorySensor(entry.entry_id, manual_history)
-    main_sensor = SmhiSeasonSensor(hass, entry.entry_id, temp_sensor_id, history_sensor)
+
+    # Distribute dates to correct sensor based on year
+    for season, date_str in date_map.items():
+        if date_str:
+            try:
+                # date_str comes as 'YYYY-MM-DD' from selector
+                d_obj = date.fromisoformat(str(date_str))
+                formatted_date = main_sensor._format_date_swedish(d_obj)
+
+                if d_obj.year == current_year:
+                    # Current year -> Main Sensor
+                    main_sensor.set_manual_arrival_date(season, formatted_date)
+                else:
+                    # Previous year -> History Sensor
+                    history_sensor.update_history(season, formatted_date)
+            except ValueError:
+                continue
 
     async_add_entities([main_sensor, history_sensor])
 
@@ -56,12 +75,11 @@ async def async_setup_entry(
 class SmhiHistorySensor(RestoreSensor, SensorEntity):
     """Sensor showing historical arrival dates."""
 
-    def __init__(self, entry_id, manual_history):
+    def __init__(self, entry_id):
         self._attr_name = "Meteorologisk årstid historisk"
         self._attr_unique_id = f"{entry_id}_history"
         self._attr_has_entity_name = True
         self._attr_icon = "mdi:calendar-clock"
-        self._manual_history = manual_history
         self._state_attributes = {
             "Vårens ankomstdatum": None,
             "Sommarens ankomstdatum": None,
@@ -75,24 +93,18 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
         return self._state_attributes
 
     async def async_added_to_hass(self):
-        """Restore state and apply manual config."""
+        """Restore state."""
         await super().async_added_to_hass()
-        
-        # 1. Restore from previous running state
         if (state := await self.async_get_last_state()) is not None:
-            self._state_attributes = dict(state.attributes)
-
-        # 2. Overwrite with manual config if provided (User edited options)
-        # Note: We check if they are not None. If user clears them, we might strictly want to keep restored state.
-        # But here we apply them if present.
-        if self._manual_history[SEASON_SPRING]:
-            self._state_attributes["Vårens ankomstdatum"] = self._manual_history[SEASON_SPRING]
-        if self._manual_history[SEASON_SUMMER]:
-            self._state_attributes["Sommarens ankomstdatum"] = self._manual_history[SEASON_SUMMER]
-        if self._manual_history[SEASON_AUTUMN]:
-            self._state_attributes["Höstens ankomstdatum"] = self._manual_history[SEASON_AUTUMN]
-        if self._manual_history[SEASON_WINTER]:
-            self._state_attributes["Vinterns ankomstdatum"] = self._manual_history[SEASON_WINTER]
+            # We restore state, but manually provided dates in __init__ (via async_setup_entry) 
+            # will override these via the update_history call which happens before adding.
+            # However, since async_added_to_hass runs AFTER setup, we need to be careful not to overwrite manual config with old state.
+            
+            restored = dict(state.attributes)
+            for k, v in restored.items():
+                # Only restore if we haven't already set it via manual config in setup
+                if self._state_attributes.get(k) is None:
+                    self._state_attributes[k] = v
 
     def update_history(self, season, date_str):
         """Update a specific historical date."""
@@ -100,7 +112,8 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
         if season == SEASON_WINTER:
             key = "Vinterns ankomstdatum"
         self._state_attributes[key] = date_str
-        self.async_write_ha_state()
+        # Note: async_write_ha_state() cannot be called before entity is added, 
+        # but in async_setup_entry we just set the dict, which is fine.
 
 
 class SmhiSeasonSensor(RestoreSensor, SensorEntity):
@@ -128,16 +141,20 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             SEASON_WINTER: None,
         }
 
+    def set_manual_arrival_date(self, season, date_str):
+        """Set arrival date manually from config."""
+        self.arrival_dates[season] = date_str
+        # If the manual date is for the 'current' season logic, we might want to update season_arrival_date too,
+        # but determining 'current' from just dates is tricky without temperature context.
+        # For now, we just populate the attribute list.
+
     @property
     def native_value(self):
         return self.current_season
 
     @property
     def extra_state_attributes(self):
-        # Determine logic for counts
         target = self.target_season()
-        
-        # Helper to simplify "0/5" logic
         def get_count(season, limit):
             if target == season:
                 return f"{self.consecutive_days}/{limit}"
@@ -147,13 +164,10 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "Ankomstdatum": self.season_arrival_date,
             "Förra dygnets medeltemp": f"{self.daily_avg_temp:.1f}°C" if self.daily_avg_temp is not None else None,
             "Senast uppdaterad": self.last_update,
-            # Cleaned up keys as requested:
             "Vinterdygn": get_count(SEASON_WINTER, 5),
             "Vårdygn": get_count(SEASON_SPRING, 7),
             "Sommardygn": get_count(SEASON_SUMMER, 5),
             "Höstdygn": get_count(SEASON_AUTUMN, 5),
-            
-            # Current cycle dates
             "Vårens ankomstdatum": self.arrival_dates[SEASON_SPRING],
             "Sommarens ankomstdatum": self.arrival_dates[SEASON_SUMMER],
             "Höstens ankomstdatum": self.arrival_dates[SEASON_AUTUMN],
@@ -170,28 +184,27 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        
         if (state := await self.async_get_last_state()) is not None:
             self.current_season = state.state
             self.season_arrival_date = state.attributes.get("Ankomstdatum")
             
-            self.arrival_dates[SEASON_SPRING] = state.attributes.get("Vårens ankomstdatum")
-            self.arrival_dates[SEASON_SUMMER] = state.attributes.get("Sommarens ankomstdatum")
-            self.arrival_dates[SEASON_AUTUMN] = state.attributes.get("Höstens ankomstdatum")
-            self.arrival_dates[SEASON_WINTER] = state.attributes.get("Vinterns ankomstdatum")
-            
-            # Try to restore consecutive days
-            # We check the new clean keys first, fallback to old keys if user just updated
+            # Restore counts
             for s, limit in [(SEASON_WINTER, 5), (SEASON_SPRING, 7), (SEASON_SUMMER, 5), (SEASON_AUTUMN, 5)]:
-                val = state.attributes.get(f"{s}dygn") # New key
+                val = state.attributes.get(f"{s}dygn")
                 if not val:
-                    val = state.attributes.get(f"{s}dygn X/{limit}") # Old key support
-                
+                    val = state.attributes.get(f"{s}dygn X/{limit}")
                 if val and val != f"0/{limit}":
                     try:
                         self.consecutive_days = int(val.split('/')[0])
                     except (ValueError, IndexError):
                         self.consecutive_days = 0
+
+            # Only restore dates if NOT set manually in setup
+            for s in [SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER]:
+                if self.arrival_dates[s] is None:
+                    # Restore from DB
+                    key = f"{s}s ankomstdatum" if s != SEASON_WINTER else "Vinterns ankomstdatum"
+                    self.arrival_dates[s] = state.attributes.get(key)
 
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)
 
@@ -201,7 +214,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         end_time = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
 
         from homeassistant.components.recorder import history
-        
         events = await self.hass.async_add_executor_job(
             history.state_changes_during_period,
             self.hass,
