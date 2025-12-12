@@ -34,6 +34,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensor platform."""
     
+    # Merge data (original setup) and options (changes made via Configure)
     config = {**entry.data, **entry.options}
     temp_sensor_id = config.get(CONF_TEMPERATURE_SENSOR)
     
@@ -96,10 +97,6 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
         """Restore state."""
         await super().async_added_to_hass()
         if (state := await self.async_get_last_state()) is not None:
-            # We restore state, but manually provided dates in __init__ (via async_setup_entry) 
-            # will override these via the update_history call which happens before adding.
-            # However, since async_added_to_hass runs AFTER setup, we need to be careful not to overwrite manual config with old state.
-            
             restored = dict(state.attributes)
             for k, v in restored.items():
                 # Only restore if we haven't already set it via manual config in setup
@@ -112,8 +109,6 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
         if season == SEASON_WINTER:
             key = "Vinterns ankomstdatum"
         self._state_attributes[key] = date_str
-        # Note: async_write_ha_state() cannot be called before entity is added, 
-        # but in async_setup_entry we just set the dict, which is fine.
 
 
 class SmhiSeasonSensor(RestoreSensor, SensorEntity):
@@ -144,9 +139,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     def set_manual_arrival_date(self, season, date_str):
         """Set arrival date manually from config."""
         self.arrival_dates[season] = date_str
-        # If the manual date is for the 'current' season logic, we might want to update season_arrival_date too,
-        # but determining 'current' from just dates is tricky without temperature context.
-        # For now, we just populate the attribute list.
 
     @property
     def native_value(self):
@@ -188,12 +180,10 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             self.current_season = state.state
             self.season_arrival_date = state.attributes.get("Ankomstdatum")
             
-            # Restore counts
-            for s, limit in [(SEASON_WINTER, 5), (SEASON_SPRING, 7), (SEASON_SUMMER, 5), (SEASON_AUTUMN, 5)]:
+            # Restore counts (Clean Version)
+            for s in [SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN]:
                 val = state.attributes.get(f"{s}dygn")
-                if not val:
-                    val = state.attributes.get(f"{s}dygn X/{limit}")
-                if val and val != f"0/{limit}":
+                if val:
                     try:
                         self.consecutive_days = int(val.split('/')[0])
                     except (ValueError, IndexError):
@@ -209,11 +199,13 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)
 
     async def _daily_check(self, now):
+        # Calculate start and end of yesterday
         yesterday = now - timedelta(days=1)
         start_time = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         end_time = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
 
         from homeassistant.components.recorder import history
+        
         events = await self.hass.async_add_executor_job(
             history.state_changes_during_period,
             self.hass,
@@ -231,6 +223,8 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 except ValueError:
                     pass
         
+        # Also get the state at the exact start of the day (midnight reading)
+        # to ensure we have data covering the full period
         start_state = self.hass.states.get(self._temp_sensor_id)
         if start_state and start_state.state not in ("unknown", "unavailable"):
              try:
@@ -250,6 +244,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         self.async_write_ha_state()
 
     def _process_smhi_logic(self, avg_temp, today_date):
+        # Use yesterday's date for logic (since temp is from yesterday)
         data_date = today_date - timedelta(days=1)
         next_season = self.target_season()
         criteria_met = False
@@ -257,6 +252,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
         if next_season == SEASON_SPRING:
             days_needed = 7
+            # > 0.0°C. Earliest Feb 15. Latest Jul 31.
             is_valid_date = (data_date.month > 2 or (data_date.month == 2 and data_date.day >= 15)) and \
                             (data_date.month < 7 or (data_date.month == 7 and data_date.day <= 31))
             if avg_temp > 0.0 and is_valid_date:
@@ -264,11 +260,13 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
         elif next_season == SEASON_SUMMER:
             days_needed = 5
+            # >= 10.0°C.
             if avg_temp >= 10.0:
                 criteria_met = True
 
         elif next_season == SEASON_AUTUMN:
             days_needed = 5
+            # < 10.0°C. Earliest Aug 1. Latest Feb 14.
             is_valid_date = (data_date.month >= 8) or \
                             (data_date.month < 2 or (data_date.month == 2 and data_date.day <= 14))
             if avg_temp < 10.0 and is_valid_date:
@@ -276,6 +274,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
         elif next_season == SEASON_WINTER:
             days_needed = 5
+            # <= 0.0°C.
             if avg_temp <= 0.0:
                 criteria_met = True
 
@@ -284,16 +283,23 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         else:
             self.consecutive_days = 0
 
+        # Check for Season Change
         if self.consecutive_days >= days_needed:
+            # Move current season date to history sensor before overwriting
             if self.arrival_dates[next_season]:
                  self._history_sensor.update_history(next_season, self.arrival_dates[next_season])
 
+            # Change Season
             self.current_season = next_season
+            
+            # Arrival date is the first day of the sequence
             arrival = data_date - timedelta(days=days_needed - 1)
             formatted_date = self._format_date_swedish(arrival)
             
             self.season_arrival_date = formatted_date
             self.arrival_dates[next_season] = formatted_date
+            
+            # Reset counter
             self.consecutive_days = 0
 
     def _format_date_swedish(self, date_obj):

@@ -2,35 +2,47 @@
     "config": {
         "step": {
             "user": {
-                "description": "Konfigurera meteorologisk årstid. Ange kända datum om du vill.",
+                "description": "Configure meteorological season.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)",
                 "data": {
-                    "temperature_sensor": "Temperatursensor (Utomhus)",
-                    "history_spring": "Senaste datum för Vår",
-                    "history_summer": "Senaste datum för Sommar",
-                    "history_autumn": "Senaste datum för Höst",
-                    "history_winter": "Senaste datum för Vinter"
+                    "temperature_sensor": "Temperature Sensor (Outdoor)",
+                    "history_spring": "Latest date for Spring",
+                    "history_summer": "Latest date for Summer",
+                    "history_autumn": "Latest date for Autumn",
+                    "history_winter": "Latest date for Winter"
+                },
+                "data_description": {
+                    "history_spring": "Definition: Daily average > 0.0°C for 7 consecutive days. Earliest Feb 15.",
+                    "history_summer": "Definition: Daily average ≥ 10.0°C for 5 consecutive days.",
+                    "history_autumn": "Definition: Daily average < 10.0°C for 5 consecutive days. Earliest Aug 1.",
+                    "history_winter": "Definition: Daily average ≤ 0.0°C for 5 consecutive days."
                 }
             }
         },
         "error": {
-            "cannot_be_future": "Datum kan inte vara i framtiden."
+            "cannot_be_future": "Date cannot be in the future."
         }
     },
     "options": {
         "step": {
             "init": {
-                "description": "Ändra inställningar för årstider.",
+                "description": "Change season settings.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)",
                 "data": {
-                    "temperature_sensor": "Temperatursensor (Utomhus)",
-                    "history_spring": "Senaste datum för Vår",
-                    "history_summer": "Senaste datum för Sommar",
-                    "history_autumn": "Senaste datum för Höst",
-                    "history_winter": "Senaste datum för Vinter"
+                    "temperature_sensor": "Temperature Sensor (Outdoor)",
+                    "history_spring": "Latest date for Spring",
+                    "history_summer": "Latest date for Summer",
+                    "history_autumn": "Latest date for Autumn",
+                    "history_winter": "Latest date for Winter"
+                },
+                "data_description": {
+                    "history_spring": "Definition: Daily average > 0.0°C for 7 consecutive days. Earliest Feb 15.",
+                    "history_summer": "Definition: Daily average ≥ 10.0°C for 5 consecutive days.",
+                    "history_autumn": "Definition: Daily average < 10.0°C for 5 consecutive days. Earliest Aug 1.",
+                    "history_winter": "Definition: Daily average ≤ 0.0°C for 5 consecutive days."
                 }
             }
         },
         "error": {
-            "cannot_be_future": "Datum kan inte vara i framtiden."
+            "cannot_be_future": "Date cannot be in the future."
         }
     }
 }
