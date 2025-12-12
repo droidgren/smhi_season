@@ -1,0 +1,12 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "description": "Välj sensorn som visar utomhustemperatur.",
+                "data": {
+                    "temperature_sensor": "Temperatursensor"
+                }
+            }
+        }
+    }
+}
