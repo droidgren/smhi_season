@@ -3,9 +3,9 @@
   "name": "Meteorologisk årstid enligt SMHI",
   "codeowners": [],
   "config_flow": true,
-  "documentation": "https://github.com/USERNAME/REPO",
+  "documentation": "https://github.com/droidgren/smhi_season",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/USERNAME/REPO/issues",
+  "issue_tracker": "https://github.com/droidgren/smhi_season/issues",
   "requirements": [],
   "version": "1.0.0",
   "context_aware": true
