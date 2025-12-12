@@ -2,9 +2,6 @@
 
 A custom integration that calculates the meteorological season based on SMHI (Swedish Meteorological and Hydrological Institute) definitions.
 
-![SMHI Season](https://img.shields.io/badge/style-SMHI-blue)
-
-
 ## Features
 - Calculates daily average temperature automatically.
 - Tracks consecutive days to determine season changes.
