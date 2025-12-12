@@ -1,0 +1,6 @@
+{
+  "name": "Meteorologisk årstid enligt SMHI",
+  "render_readme": true,
+  "filename": "smhi_season.zip",
+  "homeassistant": "2024.1.0"
+}
