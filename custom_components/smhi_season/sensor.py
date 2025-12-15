@@ -51,6 +51,11 @@ async def async_setup_entry(
 
     for season, date_str in date_map.items():
         if date_str:
+            if date_str == "MANUAL_RESET":
+                # User explicitly requested a reset for this season
+                main_sensor.set_manual_arrival_date(season, None)
+                continue
+
             try:
                 d_obj = date.fromisoformat(str(date_str))
                 formatted_date = main_sensor._format_date_swedish(d_obj)
@@ -142,6 +147,9 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             SEASON_WINTER: False,
         }
         
+        # Track which seasons were configured (manually or reset) in this session
+        self._configured_seasons = set()
+        
         self.days_needed = {
             SEASON_SPRING: 7,
             SEASON_SUMMER: 5,
@@ -150,9 +158,16 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         }
 
     def set_manual_arrival_date(self, season, date_str):
-        """Set arrival date manually from config."""
+        """Set arrival date manually from config (or clear it)."""
         self.arrival_dates[season] = date_str
-        self._manual_flags[season] = True
+        
+        # If date is None, it means we are Resetting to Auto, so Flag = False
+        if date_str is not None:
+            self._manual_flags[season] = True
+        else:
+            self._manual_flags[season] = False
+            
+        self._configured_seasons.add(season)
 
     @property
     def native_value(self):
@@ -207,39 +222,43 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
             # Restore Manual Flags
             saved_flags = state.attributes.get("manual_flags", {})
-            has_history = len(saved_flags) > 0 # Check if we have history from new version
+            has_history = len(saved_flags) > 0 
             
             if saved_flags:
                 for s in self._manual_flags:
-                    if s in saved_flags:
+                    # Only restore flag if we didn't explicitly configure it in this setup
+                    if s not in self._configured_seasons and s in saved_flags:
                         self._manual_flags[s] = saved_flags[s]
 
             # Restore Dates Logic
             for s in self.arrival_dates.keys():
+                # If we configured/reset this season in this boot, SKIP restoration
+                if s in self._configured_seasons:
+                    continue
+
                 if self.arrival_dates[s] is None:
-                    # Date is NOT in current config (User might have cleared it)
+                    # Date is NOT in current config 
                     
                     was_manual = self._manual_flags.get(s, False)
                     
-                    # LOGIC FIX:
-                    # 1. If it was flagged manual before, and is gone now -> User Reset it. (Do not restore)
-                    # 2. If we have NO history of flags (Migration), and it's gone now -> Assume User Reset it to be safe. (Do not restore)
-                    # 3. Otherwise (It was calculated), restore it.
-                    
                     should_restore = True
-                    
                     if was_manual:
+                         # It was manual before, but config is None -> User Reset it.
                          should_restore = False
                     elif not has_history:
-                         # Migration edge case: Old version didn't have flags.
-                         # If date is missing from config, we assume user wanted to clear it.
-                         should_restore = False
+                         should_restore = False 
                     
                     if should_restore:
-                        key = f"{s}s ankomstdatum" if s != SEASON_WINTER else "Vinterns ankomstdatum"
-                        self.arrival_dates[s] = state.attributes.get(key)
+                        key_map = {
+                            SEASON_SPRING: "Vårens ankomstdatum",
+                            SEASON_SUMMER: "Sommarens ankomstdatum",
+                            SEASON_AUTUMN: "Höstens ankomstdatum",
+                            SEASON_WINTER: "Vinterns ankomstdatum",
+                        }
+                        key = key_map.get(s)
+                        if key:
+                            self.arrival_dates[s] = state.attributes.get(key)
                     else:
-                        # Ensure flag is reset if we decided not to restore
                         self._manual_flags[s] = False
 
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)

@@ -2,23 +2,23 @@
     "config": {
         "step": {
             "user": {
-                "description": "Step 1: Select Sensor.\n\nConfigure meteorological season.",
+                "description": "Step 1: Select sensor.\n\nConfigure the meteorological season.",
                 "data": {
                     "temperature_sensor": "Temperature Sensor (Outdoor)"
                 }
             },
             "history": {
                 "title": "Historical Dates (Optional)",
-                "description": "Step 2: Set historical dates manually if desired.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)",
+                "description": "Step 2: \n\nEnter historical dates if you want to set them manually.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days",
                 "data": {
                     "history_spring": "Latest date for Spring",
-                    "reset_spring": "Reset Spring date",
+                    "reset_spring": "Clear date for Spring",
                     "history_summer": "Latest date for Summer",
-                    "reset_summer": "Reset Summer date",
+                    "reset_summer": "Clear date for Summer",
                     "history_autumn": "Latest date for Autumn",
-                    "reset_autumn": "Reset Autumn date",
+                    "reset_autumn": "Clear date for Autumn",
                     "history_winter": "Latest date for Winter",
-                    "reset_winter": "Reset Winter date"
+                    "reset_winter": "Clear date for Winter"
                 }
             }
         },
@@ -29,23 +29,30 @@
     "options": {
         "step": {
             "init": {
+                "menu_options": {
+                    "sensor_settings": "Sensor Settings",
+                    "history_settings": "Historical Dates Settings"
+                }
+            },
+            "sensor_settings": {
+                "title": "Sensor Settings",
+                "description": "Select the temperature sensor.",
                 "data": {
-                    "temperature_sensor": "Temperature Sensor (Outdoor)",
-                    "edit_history": "Configure historical dates"
+                    "temperature_sensor": "Temperature Sensor (Outdoor)"
                 }
             },
             "history_settings": {
-                "title": "Set previous dates (Optional)",
-                "description": "Change or clear historical dates.",
+                "title": "Historical Dates",
+                "description": "Enter historical dates if you want to set them manually.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days",
                 "data": {
                     "history_spring": "Latest date for Spring",
-                    "reset_spring": "Reset Spring date",
+                    "reset_spring": "Clear date for Spring",
                     "history_summer": "Latest date for Summer",
-                    "reset_summer": "Reset Summer date",
+                    "reset_summer": "Clear date for Summer",
                     "history_autumn": "Latest date for Autumn",
-                    "reset_autumn": "Reset Autumn date",
+                    "reset_autumn": "Clear date for Autumn",
                     "history_winter": "Latest date for Winter",
-                    "reset_winter": "Reset Winter date"
+                    "reset_winter": "Clear date for Winter"
                 }
             }
         },

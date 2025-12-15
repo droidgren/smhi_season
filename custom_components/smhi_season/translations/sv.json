@@ -2,14 +2,14 @@
     "config": {
         "step": {
             "user": {
-                "description": "Steg 1: Välj sensor.\n\nKonfigurera meteorologisk årstid.",
+                "description": "Steg 1: Välj sensor.",
                 "data": {
                     "temperature_sensor": "Temperatursensor (Utomhus)"
                 }
             },
             "history": {
                 "title": "Historiska Datum (Valfritt)",
-                "description": "Steg 2: Ange historiska datum om du vill ställa in dem manuellt.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)",
+                "description": "Steg 2: \n\nAnge historiska datum om du vill ställa in dem manuellt.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitioner:**\n* **Vår:** > 0°C i 7 dagar (tidigast 15 feb)\n* **Sommar:** ≥ 10°C i 5 dagar\n* **Höst:** < 10°C i 5 dagar (tidigast 1 aug)\n* **Vinter:** ≤ 0°C i 5 dagar",
                 "data": {
                     "history_spring": "Senaste datum för Vår",
                     "reset_spring": "Rensa datum för Vår",
@@ -29,14 +29,21 @@
     "options": {
         "step": {
             "init": {
+                "menu_options": {
+                    "sensor_settings": "Inställningar för sensor",
+                    "history_settings": "Inställningar för historiska datum"
+                }
+            },
+            "sensor_settings": {
+                "title": "Sensorinställningar",
+                "description": "Välj temperatursensor.",
                 "data": {
-                    "temperature_sensor": "Temperatursensor (Utomhus)",
-                    "edit_history": "Konfigurera historiska datum"
+                    "temperature_sensor": "Temperatursensor (Utomhus)"
                 }
             },
             "history_settings": {
-                "title": "Ange tidigare datum (Valfritt)",
-                "description": "Ändra eller rensa historiska datum.",
+                "title": "Historiska Datum",
+                "description": "Ange historiska datum om du vill ställa in dem manuellt.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitioner:**\n* **Vår:** > 0°C i 7 dagar (tidigast 15 feb)\n* **Sommar:** ≥ 10°C i 5 dagar\n* **Höst:** < 10°C i 5 dagar (tidigast 1 aug)\n* **Vinter:** ≤ 0°C i 5 dagar",
                 "data": {
                     "history_spring": "Senaste datum för Vår",
                     "reset_spring": "Rensa datum för Vår",
