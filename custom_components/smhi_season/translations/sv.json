@@ -2,20 +2,19 @@
     "config": {
         "step": {
             "user": {
-                "description": "Konfigurera meteorologisk årstid.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)",
+                "description": "Steg 1: Välj sensor.\n\nKonfigurera meteorologisk årstid.",
                 "data": {
-                    "temperature_sensor": "Temperatursensor (Utomhus)",
-                    "history_dates": "Ange tidigare datum för årstider (Valfritt)",
+                    "temperature_sensor": "Temperatursensor (Utomhus)"
+                }
+            },
+            "history": {
+                "title": "Historiska Datum (Valfritt)",
+                "description": "Steg 2: Ange historiska datum om du vill ställa in dem manuellt.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)",
+                "data": {
                     "history_spring": "Senaste datum för Vår",
                     "history_summer": "Senaste datum för Sommar",
                     "history_autumn": "Senaste datum för Höst",
                     "history_winter": "Senaste datum för Vinter"
-                },
-                "data_description": {
-                    "history_spring": "Definition: Dygnsmedeltemp > 0.0°C i 7 dygn följd. Tidigast 15 februari.",
-                    "history_summer": "Definition: Dygnsmedeltemp ≥ 10.0°C i 5 dygn följd.",
-                    "history_autumn": "Definition: Dygnsmedeltemp < 10.0°C i 5 dygn följd. Tidigast 1 augusti.",
-                    "history_winter": "Definition: Dygnsmedeltemp ≤ 0.0°C i 5 dygn följd."
                 }
             }
         },
@@ -26,20 +25,29 @@
     "options": {
         "step": {
             "init": {
-                "description": "Ändra inställningar för årstider.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)",
+                "menu_options": {
+                    "sensor_settings": "Inställningar för Sensor",
+                    "history_settings": "Inställningar för Historik"
+                }
+            },
+            "sensor_settings": {
+                "title": "Sensorinställningar",
                 "data": {
-                    "temperature_sensor": "Temperatursensor (Utomhus)",
-                    "history_dates": "Ange tidigare datum för årstider (Valfritt)",
+                    "temperature_sensor": "Temperatursensor (Utomhus)"
+                }
+            },
+            "history_settings": {
+                "title": "Historiska Datum",
+                "description": "Ändra eller rensa historiska datum.",
+                "data": {
                     "history_spring": "Senaste datum för Vår",
+                    "reset_spring": "Rensa datum för Vår",
                     "history_summer": "Senaste datum för Sommar",
+                    "reset_summer": "Rensa datum för Sommar",
                     "history_autumn": "Senaste datum för Höst",
-                    "history_winter": "Senaste datum för Vinter"
-                },
-                "data_description": {
-                    "history_spring": "Definition: Dygnsmedeltemp > 0.0°C i 7 dygn följd. Tidigast 15 februari.",
-                    "history_summer": "Definition: Dygnsmedeltemp ≥ 10.0°C i 5 dygn följd.",
-                    "history_autumn": "Definition: Dygnsmedeltemp < 10.0°C i 5 dygn följd. Tidigast 1 augusti.",
-                    "history_winter": "Definition: Dygnsmedeltemp ≤ 0.0°C i 5 dygn följd."
+                    "reset_autumn": "Rensa datum för Höst",
+                    "history_winter": "Senaste datum för Vinter",
+                    "reset_winter": "Rensa datum för Vinter"
                 }
             }
         },
