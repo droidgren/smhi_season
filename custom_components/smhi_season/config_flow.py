@@ -64,18 +64,37 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
+            # Handle Resets (in case user selected a date then wanted to clear it)
+            if user_input.get("reset_spring"): user_input[CONF_HISTORY_SPRING] = None
+            if user_input.get("reset_summer"): user_input[CONF_HISTORY_SUMMER] = None
+            if user_input.get("reset_autumn"): user_input[CONF_HISTORY_AUTUMN] = None
+            if user_input.get("reset_winter"): user_input[CONF_HISTORY_WINTER] = None
+            
+            # Clean up reset keys
+            for key in ["reset_spring", "reset_summer", "reset_autumn", "reset_winter"]:
+                user_input.pop(key, None)
+
             self._normalize_dates(user_input)
+            
             if self._validate_dates(user_input, errors):
                 final_data = {**self._config_data, **user_input}
                 return self.async_create_entry(
                     title="Meteorologisk Årstid", data=final_data
                 )
 
+        # Allow empty strings (str) in validation to prevent "Required" errors if left empty
         schema = vol.Schema({
-            vol.Optional(CONF_HISTORY_SPRING): selector.DateSelector(),
-            vol.Optional(CONF_HISTORY_SUMMER): selector.DateSelector(),
-            vol.Optional(CONF_HISTORY_AUTUMN): selector.DateSelector(),
-            vol.Optional(CONF_HISTORY_WINTER): selector.DateSelector(),
+            vol.Optional(CONF_HISTORY_SPRING): vol.Any(selector.DateSelector(), str),
+            vol.Optional("reset_spring", default=False): bool,
+            
+            vol.Optional(CONF_HISTORY_SUMMER): vol.Any(selector.DateSelector(), str),
+            vol.Optional("reset_summer", default=False): bool,
+            
+            vol.Optional(CONF_HISTORY_AUTUMN): vol.Any(selector.DateSelector(), str),
+            vol.Optional("reset_autumn", default=False): bool,
+            
+            vol.Optional(CONF_HISTORY_WINTER): vol.Any(selector.DateSelector(), str),
+            vol.Optional("reset_winter", default=False): bool,
         })
 
         return self.async_show_form(
@@ -119,23 +138,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         errors = {}
         
         if user_input is not None:
-            # If user wants to edit history, go to next step
             if user_input.get("edit_history"):
-                # Save sensor selection to options temporarily or pass it along?
-                # Actually, we can just update the entry with what we have if we aren't done,
-                # but standard practice is to chain steps.
-                
-                # We need to preserve the sensor choice for the next save
+                # Preserve sensor choice
                 self.sensor_choice = user_input.get(CONF_TEMPERATURE_SENSOR)
                 return await self.async_step_history_settings()
             
-            # If not editing history, save and finish
+            # Save and finish
             current_options = dict(self.config_entry.options)
             current_options[CONF_TEMPERATURE_SENSOR] = user_input[CONF_TEMPERATURE_SENSOR]
             
             return self.async_create_entry(title="", data=current_options)
 
-        # Default Sensor
         current_sensor = self.config_entry.options.get(
             CONF_TEMPERATURE_SENSOR, 
             self.config_entry.data.get(CONF_TEMPERATURE_SENSOR)
@@ -161,43 +174,39 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         errors = {}
         
         if user_input is not None:
-            # Handle Resets
             if user_input.get("reset_spring"): user_input[CONF_HISTORY_SPRING] = None
             if user_input.get("reset_summer"): user_input[CONF_HISTORY_SUMMER] = None
             if user_input.get("reset_autumn"): user_input[CONF_HISTORY_AUTUMN] = None
             if user_input.get("reset_winter"): user_input[CONF_HISTORY_WINTER] = None
             
-            # Clean up keys
             for key in ["reset_spring", "reset_summer", "reset_autumn", "reset_winter"]:
                 user_input.pop(key, None)
 
             self._normalize_dates(user_input)
 
             if self._validate_dates(user_input, errors):
-                # Update options
                 current_options = dict(self.config_entry.options)
                 current_options.update(user_input)
                 
-                # Update sensor if changed in previous step
                 if hasattr(self, 'sensor_choice'):
                     current_options[CONF_TEMPERATURE_SENSOR] = self.sensor_choice
                 
                 return self.async_create_entry(title="", data=current_options)
 
-        # Load defaults
         defaults = {**self.config_entry.data, **self.config_entry.options}
 
+        # Also apply vol.Any here to be consistent and safe
         schema = vol.Schema({
-            vol.Optional(CONF_HISTORY_SPRING, default=defaults.get(CONF_HISTORY_SPRING)): selector.DateSelector(),
+            vol.Optional(CONF_HISTORY_SPRING, default=defaults.get(CONF_HISTORY_SPRING)): vol.Any(selector.DateSelector(), str),
             vol.Optional("reset_spring", default=False): bool,
             
-            vol.Optional(CONF_HISTORY_SUMMER, default=defaults.get(CONF_HISTORY_SUMMER)): selector.DateSelector(),
+            vol.Optional(CONF_HISTORY_SUMMER, default=defaults.get(CONF_HISTORY_SUMMER)): vol.Any(selector.DateSelector(), str),
             vol.Optional("reset_summer", default=False): bool,
             
-            vol.Optional(CONF_HISTORY_AUTUMN, default=defaults.get(CONF_HISTORY_AUTUMN)): selector.DateSelector(),
+            vol.Optional(CONF_HISTORY_AUTUMN, default=defaults.get(CONF_HISTORY_AUTUMN)): vol.Any(selector.DateSelector(), str),
             vol.Optional("reset_autumn", default=False): bool,
             
-            vol.Optional(CONF_HISTORY_WINTER, default=defaults.get(CONF_HISTORY_WINTER)): selector.DateSelector(),
+            vol.Optional(CONF_HISTORY_WINTER, default=defaults.get(CONF_HISTORY_WINTER)): vol.Any(selector.DateSelector(), str),
             vol.Optional("reset_winter", default=False): bool,
         })
 

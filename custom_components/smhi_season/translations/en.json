@@ -12,9 +12,13 @@
                 "description": "Step 2: Set historical dates manually if desired.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)",
                 "data": {
                     "history_spring": "Latest date for Spring",
+                    "reset_spring": "Reset Spring date",
                     "history_summer": "Latest date for Summer",
+                    "reset_summer": "Reset Summer date",
                     "history_autumn": "Latest date for Autumn",
-                    "history_winter": "Latest date for Winter"
+                    "reset_autumn": "Reset Autumn date",
+                    "history_winter": "Latest date for Winter",
+                    "reset_winter": "Reset Winter date"
                 }
             }
         },

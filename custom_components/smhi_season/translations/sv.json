@@ -12,9 +12,13 @@
                 "description": "Steg 2: Ange historiska datum om du vill ställa in dem manuellt.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)",
                 "data": {
                     "history_spring": "Senaste datum för Vår",
+                    "reset_spring": "Rensa datum för Vår",
                     "history_summer": "Senaste datum för Sommar",
+                    "reset_summer": "Rensa datum för Sommar",
                     "history_autumn": "Senaste datum för Höst",
-                    "history_winter": "Senaste datum för Vinter"
+                    "reset_autumn": "Rensa datum för Höst",
+                    "history_winter": "Senaste datum för Vinter",
+                    "reset_winter": "Rensa datum för Vinter"
                 }
             }
         },
