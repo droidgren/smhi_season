@@ -34,18 +34,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensor platform."""
     
-    # Merge data (original setup) and options (changes made via Configure)
     config = {**entry.data, **entry.options}
     temp_sensor_id = config.get(CONF_TEMPERATURE_SENSOR)
     
-    # Initialize sensors
     history_sensor = SmhiHistorySensor(entry.entry_id)
     main_sensor = SmhiSeasonSensor(hass, entry.entry_id, temp_sensor_id, history_sensor)
 
-    # --- PROCESS MANUAL DATES ---
     current_year = date.today().year
     
-    # Map config keys to season constants
     date_map = {
         SEASON_SPRING: config.get(CONF_HISTORY_SPRING),
         SEASON_SUMMER: config.get(CONF_HISTORY_SUMMER),
@@ -53,19 +49,15 @@ async def async_setup_entry(
         SEASON_WINTER: config.get(CONF_HISTORY_WINTER),
     }
 
-    # Distribute dates to correct sensor based on year
     for season, date_str in date_map.items():
         if date_str:
             try:
-                # date_str comes as 'YYYY-MM-DD' from selector
                 d_obj = date.fromisoformat(str(date_str))
                 formatted_date = main_sensor._format_date_swedish(d_obj)
 
                 if d_obj.year == current_year:
-                    # Current year -> Main Sensor
                     main_sensor.set_manual_arrival_date(season, formatted_date)
                 else:
-                    # Previous year -> History Sensor
                     history_sensor.update_history(season, formatted_date)
             except ValueError:
                 _LOGGER.warning("Invalid date format for %s: %s", season, date_str)
@@ -100,7 +92,6 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
         if (state := await self.async_get_last_state()) is not None:
             restored = dict(state.attributes)
             for k, v in restored.items():
-                # Only restore if we haven't already set it via manual config in setup
                 if self._state_attributes.get(k) is None:
                     self._state_attributes[k] = v
 
@@ -127,7 +118,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         self.current_season = SEASON_UNKNOWN
         self.season_arrival_date = None
         
-        # Independent counters for each season
         self.consecutive_counts = {
             SEASON_SPRING: 0, 
             SEASON_SUMMER: 0, 
@@ -145,6 +135,14 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             SEASON_WINTER: None,
         }
         
+        # Track if a date was manually set or calculated
+        self._manual_flags = {
+            SEASON_SPRING: False,
+            SEASON_SUMMER: False,
+            SEASON_AUTUMN: False,
+            SEASON_WINTER: False,
+        }
+        
         self.days_needed = {
             SEASON_SPRING: 7,
             SEASON_SUMMER: 5,
@@ -155,6 +153,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     def set_manual_arrival_date(self, season, date_str):
         """Set arrival date manually from config."""
         self.arrival_dates[season] = date_str
+        self._manual_flags[season] = True
 
     @property
     def native_value(self):
@@ -177,6 +176,8 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "Sommarens ankomstdatum": self.arrival_dates[SEASON_SUMMER],
             "Höstens ankomstdatum": self.arrival_dates[SEASON_AUTUMN],
             "Vinterns ankomstdatum": self.arrival_dates[SEASON_WINTER],
+            # Store manual flags in attributes to persist them across restarts
+            "manual_flags": self._manual_flags
         }
         return attrs
 
@@ -192,7 +193,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         if (state := await self.async_get_last_state()) is not None:
             self.current_season = state.state
             
-            # Ensure valid state
             if self.current_season in ("unknown", "unavailable", None):
                 self.current_season = SEASON_UNKNOWN
             
@@ -207,16 +207,36 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     except (ValueError, IndexError):
                         self.consecutive_counts[s] = 0
 
-            # Only restore dates if NOT set manually in setup
+            # Restore Manual Flags
+            saved_flags = state.attributes.get("manual_flags", {})
+            if saved_flags:
+                for s in self._manual_flags:
+                    if s in saved_flags:
+                        self._manual_flags[s] = saved_flags[s]
+
+            # Logic to restore dates:
+            # Only restore if it was NOT set in the current setup.
+            # AND: If it was marked as 'Manual' in the previous state, but is NOT in current config, 
+            # it means the user deleted it. So we do NOT restore it.
             for s in self.arrival_dates.keys():
                 if self.arrival_dates[s] is None:
-                    key = f"{s}s ankomstdatum" if s != SEASON_WINTER else "Vinterns ankomstdatum"
-                    self.arrival_dates[s] = state.attributes.get(key)
+                    # Current setup didn't set it (config is None)
+                    
+                    was_manual = self._manual_flags.get(s, False)
+                    
+                    if was_manual:
+                         # It was manual before, and now it's gone from config.
+                         # This implies a Reset. Do not restore.
+                         self._manual_flags[s] = False # Reset flag
+                         pass 
+                    else:
+                        # It was calculated (or not set), so we restore the calculated date
+                        key = f"{s}s ankomstdatum" if s != SEASON_WINTER else "Vinterns ankomstdatum"
+                        self.arrival_dates[s] = state.attributes.get(key)
 
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)
 
     async def _daily_check(self, now):
-        # Calculate start and end of yesterday
         yesterday = now - timedelta(days=1)
         start_time = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         end_time = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -259,7 +279,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         self.async_write_ha_state()
 
     def _process_smhi_logic(self, avg_temp, today_date):
-        # Use yesterday's date for logic
         data_date = today_date - timedelta(days=1)
         
         _LOGGER.info(
@@ -267,7 +286,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             data_date, avg_temp, self.current_season
         )
         
-        # Determine all criteria met
+        # Criteria Logic
         is_spring_day = avg_temp > 0.0 and \
                         (data_date.month > 2 or (data_date.month == 2 and data_date.day >= 15)) and \
                         (data_date.month < 7 or (data_date.month == 7 and data_date.day <= 31))
@@ -287,7 +306,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             SEASON_WINTER: is_winter_day,
         }
         
-        # Independent Counting Logic
         new_counts = self.consecutive_counts.copy()
         
         for season, is_day in criteria_map.items():
@@ -308,14 +326,11 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         self.consecutive_counts = new_counts
         next_season = self.target_season()
 
-        # Check for Season Change
         for season, count in self.consecutive_counts.items():
             days_needed_for_season = self.days_needed[season]
             
-            # --- Check 1: Criteria met ---
             if count >= days_needed_for_season:
                 
-                # --- Check 2: Sequential transition ---
                 if season != next_season:
                     _LOGGER.info(
                         "[%s] Criteria met for '%s' (%d/%d), but logical next season is '%s'. Transition blocked.",
@@ -323,10 +338,8 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     )
                     continue 
                 
-                # Arrival date is the first day of the sequence
                 arrival_dt = data_date - timedelta(days=days_needed_for_season - 1)
                 
-                # --- Check 3: Is arrival date already set (and current)? ---
                 existing_date_str = self.arrival_dates.get(season)
                 should_update = True
                 
@@ -334,8 +347,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     existing_dt = self._parse_date_swedish(existing_date_str, arrival_dt.year)
                     if existing_dt:
                         diff = arrival_dt - existing_dt
-                        # If the stored date is older than 6 months (approx 180 days), 
-                        # treat it as an old season and allow update.
                         if diff.days < 180 and diff.days > -180:
                             should_update = False
                             _LOGGER.info(
@@ -356,6 +367,9 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     self.season_arrival_date = formatted_date
                     self.arrival_dates[season] = formatted_date
                     
+                    # Calculated date -> Not manual
+                    self._manual_flags[season] = False
+                    
                     _LOGGER.info(
                         "[%s] *** SEASON CHANGE ***: Transitioned to '%s'. Arrival date set to %s.",
                         data_date, season, formatted_date
@@ -363,7 +377,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     
                     self.consecutive_counts[season] = 0
                 else:
-                    # Reset counter if blocked, to wait for next valid sequence
                     self.consecutive_counts[season] = 0
 
         _LOGGER.info(
@@ -379,7 +392,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         return f"{date_obj.day} {months[date_obj.month - 1]} {date_obj.year}"
 
     def _parse_date_swedish(self, date_str, fallback_year):
-        """Parse Swedish date string back to date object."""
         try:
             parts = date_str.split(" ")
             day = int(parts[0])

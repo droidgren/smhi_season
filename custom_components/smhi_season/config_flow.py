@@ -42,11 +42,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Store the sensor selection and move to next step
             self._config_data.update(user_input)
             return await self.async_step_history()
 
-        # Schema for Step 1: Just the sensor
         schema = vol.Schema({
             vol.Required(CONF_TEMPERATURE_SENSOR): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
@@ -66,18 +64,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Normalize empty strings
             self._normalize_dates(user_input)
-            
-            # Validate
             if self._validate_dates(user_input, errors):
-                # Merge with previous step data
                 final_data = {**self._config_data, **user_input}
                 return self.async_create_entry(
                     title="Meteorologisk Årstid", data=final_data
                 )
 
-        # Schema for Step 2: Dates (All optional)
         schema = vol.Schema({
             vol.Optional(CONF_HISTORY_SPRING): selector.DateSelector(),
             vol.Optional(CONF_HISTORY_SUMMER): selector.DateSelector(),
@@ -92,17 +85,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     def _normalize_dates(self, user_input):
-        """Convert empty strings to None."""
         date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
         for key in date_keys:
             if key in user_input and user_input[key] == "":
                 user_input[key] = None
 
     def _validate_dates(self, user_input, errors):
-        """Check if any provided date is in the future."""
         today = date.today()
         date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
-        
         for key in date_keys:
             if input_date_str := user_input.get(key):
                 try:
@@ -116,7 +106,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options flow for SMHI Season with Menu."""
+    """Handle options flow for SMHI Season."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
@@ -125,26 +115,27 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage the options menu."""
-        return self.async_show_menu(
-            step_id="init",
-            menu_options=["sensor_settings", "history_settings"]
-        )
-
-    async def async_step_sensor_settings(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle sensor settings sub-dialog."""
+        """Manage the main options (Sensor Selection)."""
         errors = {}
         
         if user_input is not None:
-            # Get current options to preserve other settings
+            # If user wants to edit history, go to next step
+            if user_input.get("edit_history"):
+                # Save sensor selection to options temporarily or pass it along?
+                # Actually, we can just update the entry with what we have if we aren't done,
+                # but standard practice is to chain steps.
+                
+                # We need to preserve the sensor choice for the next save
+                self.sensor_choice = user_input.get(CONF_TEMPERATURE_SENSOR)
+                return await self.async_step_history_settings()
+            
+            # If not editing history, save and finish
             current_options = dict(self.config_entry.options)
-            current_options.update(user_input)
+            current_options[CONF_TEMPERATURE_SENSOR] = user_input[CONF_TEMPERATURE_SENSOR]
             
             return self.async_create_entry(title="", data=current_options)
 
-        # Default: Current sensor
+        # Default Sensor
         current_sensor = self.config_entry.options.get(
             CONF_TEMPERATURE_SENSOR, 
             self.config_entry.data.get(CONF_TEMPERATURE_SENSOR)
@@ -153,11 +144,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         schema = vol.Schema({
             vol.Required(CONF_TEMPERATURE_SENSOR, default=current_sensor): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-            )
+            ),
+            vol.Optional("edit_history", default=False): bool
         })
 
         return self.async_show_form(
-            step_id="sensor_settings",
+            step_id="init",
             data_schema=schema,
             errors=errors
         )
@@ -175,17 +167,21 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             if user_input.get("reset_autumn"): user_input[CONF_HISTORY_AUTUMN] = None
             if user_input.get("reset_winter"): user_input[CONF_HISTORY_WINTER] = None
             
-            # Clean up reset keys
+            # Clean up keys
             for key in ["reset_spring", "reset_summer", "reset_autumn", "reset_winter"]:
                 user_input.pop(key, None)
 
-            # Normalize empty strings
             self._normalize_dates(user_input)
 
             if self._validate_dates(user_input, errors):
                 # Update options
                 current_options = dict(self.config_entry.options)
                 current_options.update(user_input)
+                
+                # Update sensor if changed in previous step
+                if hasattr(self, 'sensor_choice'):
+                    current_options[CONF_TEMPERATURE_SENSOR] = self.sensor_choice
+                
                 return self.async_create_entry(title="", data=current_options)
 
         # Load defaults
@@ -212,17 +208,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
 
     def _normalize_dates(self, user_input):
-        """Convert empty strings to None."""
         date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
         for key in date_keys:
             if key in user_input and user_input[key] == "":
                 user_input[key] = None
 
     def _validate_dates(self, user_input, errors):
-        """Check if any provided date is in the future."""
         today = date.today()
         date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
-        
         for key in date_keys:
             if input_date_str := user_input.get(key):
                 try:
