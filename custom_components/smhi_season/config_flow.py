@@ -100,9 +100,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for SMHI Season."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        # FIX for AttributeError: property 'config_entry' has no setter
-        # Call super().__init__ to let the base class handle initialization of config_entry
-        super().__init__(config_entry)
+        """Initialize options flow."""
+        # We must accept the argument because async_get_options_flow passes it.
+        # We store it in a private variable just in case, but usually 
+        # self.config_entry (property) is managed automatically by HA.
+        self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -125,6 +127,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         # Default Schema Load
+        # Use self.config_entry property which is automatically populated
         current_config = {**self.config_entry.data, **self.config_entry.options}
         schema = self._build_schema(current_config)
         
