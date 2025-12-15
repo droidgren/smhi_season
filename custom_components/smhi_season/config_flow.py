@@ -38,6 +38,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
+            # Normalize empty string dates to None for proper saving/resetting
+            date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
+            for key in date_keys:
+                if key in user_input and user_input[key] == "":
+                    user_input[key] = None
+                    
             # Validate dates are not in the future
             if not self._validate_dates(user_input, errors):
                 return self.async_show_form(
@@ -63,8 +69,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         for key in date_keys:
             if input_date_str := user_input.get(key):
-                # Selector returns specific format, but verify object type if needed
-                # Usually selector returns str 'YYYY-MM-DD'
                 try:
                     input_date = date.fromisoformat(str(input_date_str))
                     if input_date > today:
@@ -96,7 +100,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for SMHI Season."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        pass
+        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -105,10 +109,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         errors = {}
         
         if user_input is not None:
+            # Normalize empty string dates to None for proper saving/resetting
+            date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
+            for key in date_keys:
+                if key in user_input and user_input[key] == "":
+                    user_input[key] = None
+                    
             # Validate dates are not in the future
             if not self._validate_dates(user_input, errors):
-                # Re-show form with errors
-                # Re-build schema with user input to keep their bad selection visible
                 schema = self._build_schema(user_input)
                 return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
 
