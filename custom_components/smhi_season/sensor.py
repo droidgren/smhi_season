@@ -135,7 +135,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             SEASON_WINTER: None,
         }
         
-        # Track if a date was manually set or calculated
         self._manual_flags = {
             SEASON_SPRING: False,
             SEASON_SUMMER: False,
@@ -176,7 +175,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "Sommarens ankomstdatum": self.arrival_dates[SEASON_SUMMER],
             "Höstens ankomstdatum": self.arrival_dates[SEASON_AUTUMN],
             "Vinterns ankomstdatum": self.arrival_dates[SEASON_WINTER],
-            # Store manual flags in attributes to persist them across restarts
             "manual_flags": self._manual_flags
         }
         return attrs
@@ -209,30 +207,40 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
             # Restore Manual Flags
             saved_flags = state.attributes.get("manual_flags", {})
+            has_history = len(saved_flags) > 0 # Check if we have history from new version
+            
             if saved_flags:
                 for s in self._manual_flags:
                     if s in saved_flags:
                         self._manual_flags[s] = saved_flags[s]
 
-            # Logic to restore dates:
-            # Only restore if it was NOT set in the current setup.
-            # AND: If it was marked as 'Manual' in the previous state, but is NOT in current config, 
-            # it means the user deleted it. So we do NOT restore it.
+            # Restore Dates Logic
             for s in self.arrival_dates.keys():
                 if self.arrival_dates[s] is None:
-                    # Current setup didn't set it (config is None)
+                    # Date is NOT in current config (User might have cleared it)
                     
                     was_manual = self._manual_flags.get(s, False)
                     
+                    # LOGIC FIX:
+                    # 1. If it was flagged manual before, and is gone now -> User Reset it. (Do not restore)
+                    # 2. If we have NO history of flags (Migration), and it's gone now -> Assume User Reset it to be safe. (Do not restore)
+                    # 3. Otherwise (It was calculated), restore it.
+                    
+                    should_restore = True
+                    
                     if was_manual:
-                         # It was manual before, and now it's gone from config.
-                         # This implies a Reset. Do not restore.
-                         self._manual_flags[s] = False # Reset flag
-                         pass 
-                    else:
-                        # It was calculated (or not set), so we restore the calculated date
+                         should_restore = False
+                    elif not has_history:
+                         # Migration edge case: Old version didn't have flags.
+                         # If date is missing from config, we assume user wanted to clear it.
+                         should_restore = False
+                    
+                    if should_restore:
                         key = f"{s}s ankomstdatum" if s != SEASON_WINTER else "Vinterns ankomstdatum"
                         self.arrival_dates[s] = state.attributes.get(key)
+                    else:
+                        # Ensure flag is reset if we decided not to restore
+                        self._manual_flags[s] = False
 
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)
 
@@ -367,7 +375,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     self.season_arrival_date = formatted_date
                     self.arrival_dates[season] = formatted_date
                     
-                    # Calculated date -> Not manual
                     self._manual_flags[season] = False
                     
                     _LOGGER.info(
