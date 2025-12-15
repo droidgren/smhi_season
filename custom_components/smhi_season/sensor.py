@@ -124,7 +124,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         self._attr_unique_id = f"{entry_id}_main"
         self._attr_icon = "mdi:weather-partly-cloudy"
         
-        self.current_season = SEASON_WINTER  # Start with winter instead of unknown
+        self.current_season = SEASON_UNKNOWN
         self.season_arrival_date = None
         self.last_update = None
         self.daily_avg_temp = None
@@ -182,8 +182,9 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
         if (state := await self.async_get_last_state()) is not None:
-            # Restore state, but never set to "unknown" or "unavailable"
-            if state.state in [SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN]:
+            # Restore state, but never set to "unavailable"
+            # Valid states are: Okänd, Vinter, Vår, Sommar, Höst
+            if state.state not in ("unavailable", "unknown"):
                 self.current_season = state.state
             
             self.season_arrival_date = state.attributes.get("Ankomstdatum")

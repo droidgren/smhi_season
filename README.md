@@ -67,7 +67,7 @@ logger:
 
 ## Attributes
 The main sensor provides:
-- **Current State:** Always shows the current season (Vinter, Vår, Sommar, or Höst) - never "unknown" or "unavailable"
+- **Current State:** Shows the current season (Okänd, Vinter, Vår, Sommar, or Höst) - never "unavailable"
 - **Ankomstdatum:** Date the current season started.
 - **Vinterdygn X/5:** Progress towards Winter (tracks continuously, even if winter is already set).
 - **Vårdygn X/7:** Progress towards Spring (tracks continuously, even if spring is already set).
