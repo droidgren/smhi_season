@@ -5,6 +5,7 @@
                 "description": "Configure meteorological season.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)",
                 "data": {
                     "temperature_sensor": "Temperature Sensor (Outdoor)",
+                    "history_dates": "Set historical season dates (Optional)",
                     "history_spring": "Latest date for Spring",
                     "history_summer": "Latest date for Summer",
                     "history_autumn": "Latest date for Autumn",
@@ -28,6 +29,7 @@
                 "description": "Change season settings.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)",
                 "data": {
                     "temperature_sensor": "Temperature Sensor (Outdoor)",
+                    "history_dates": "Set historical season dates (Optional)",
                     "history_spring": "Latest date for Spring",
                     "history_summer": "Latest date for Summer",
                     "history_autumn": "Latest date for Autumn",

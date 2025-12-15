@@ -5,6 +5,7 @@
                 "description": "Konfigurera meteorologisk årstid.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)",
                 "data": {
                     "temperature_sensor": "Temperatursensor (Utomhus)",
+                    "history_dates": "Ange tidigare datum för årstider (Valfritt)",
                     "history_spring": "Senaste datum för Vår",
                     "history_summer": "Senaste datum för Sommar",
                     "history_autumn": "Senaste datum för Höst",
@@ -28,6 +29,7 @@
                 "description": "Ändra inställningar för årstider.\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)",
                 "data": {
                     "temperature_sensor": "Temperatursensor (Utomhus)",
+                    "history_dates": "Ange tidigare datum för årstider (Valfritt)",
                     "history_spring": "Senaste datum för Vår",
                     "history_summer": "Senaste datum för Sommar",
                     "history_autumn": "Senaste datum för Höst",
