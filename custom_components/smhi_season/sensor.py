@@ -123,11 +123,18 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         self._attr_unique_id = f"{entry_id}_main"
         self._attr_icon = "mdi:weather-partly-cloudy"
         
-        self.current_season = SEASON_UNKNOWN
+        self.current_season = SEASON_WINTER  # Start with winter instead of unknown
         self.season_arrival_date = None
-        self.consecutive_days = 0
         self.last_update = None
         self.daily_avg_temp = None
+
+        # Track counters for ALL seasons simultaneously
+        self.season_counters = {
+            SEASON_WINTER: 0,
+            SEASON_SPRING: 0,
+            SEASON_SUMMER: 0,
+            SEASON_AUTUMN: 0,
+        }
 
         self.arrival_dates = {
             SEASON_SPRING: None,
@@ -135,10 +142,20 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             SEASON_AUTUMN: None,
             SEASON_WINTER: None,
         }
+        
+        # Track which dates are manually set (to avoid overriding)
+        self.manual_dates = {
+            SEASON_SPRING: False,
+            SEASON_SUMMER: False,
+            SEASON_AUTUMN: False,
+            SEASON_WINTER: False,
+        }
 
     def set_manual_arrival_date(self, season, date_str):
         """Set arrival date manually from config."""
         self.arrival_dates[season] = date_str
+        self.manual_dates[season] = True
+        _LOGGER.info("Manually set %s arrival date to %s", season, date_str)
 
     @property
     def native_value(self):
@@ -146,20 +163,14 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     @property
     def extra_state_attributes(self):
-        target = self.target_season()
-        def get_count(season, limit):
-            if target == season:
-                return f"{self.consecutive_days}/{limit}"
-            return f"0/{limit}"
-
         attrs = {
             "Ankomstdatum": self.season_arrival_date,
             "Förra dygnets medeltemp": f"{self.daily_avg_temp:.1f}°C" if self.daily_avg_temp is not None else None,
             "Senast uppdaterad": self.last_update,
-            "Vinterdygn": get_count(SEASON_WINTER, 5),
-            "Vårdygn": get_count(SEASON_SPRING, 7),
-            "Sommardygn": get_count(SEASON_SUMMER, 5),
-            "Höstdygn": get_count(SEASON_AUTUMN, 5),
+            "Vinterdygn": f"{self.season_counters[SEASON_WINTER]}/5",
+            "Vårdygn": f"{self.season_counters[SEASON_SPRING]}/7",
+            "Sommardygn": f"{self.season_counters[SEASON_SUMMER]}/5",
+            "Höstdygn": f"{self.season_counters[SEASON_AUTUMN]}/5",
             "Vårens ankomstdatum": self.arrival_dates[SEASON_SPRING],
             "Sommarens ankomstdatum": self.arrival_dates[SEASON_SUMMER],
             "Höstens ankomstdatum": self.arrival_dates[SEASON_AUTUMN],
@@ -167,42 +178,48 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         }
         return attrs
 
-    def target_season(self):
-        if self.current_season == SEASON_WINTER: return SEASON_SPRING
-        if self.current_season == SEASON_SPRING: return SEASON_SUMMER
-        if self.current_season == SEASON_SUMMER: return SEASON_AUTUMN
-        if self.current_season == SEASON_AUTUMN: return SEASON_WINTER
-        return SEASON_WINTER
-
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
         if (state := await self.async_get_last_state()) is not None:
-            self.current_season = state.state
+            # Restore state, but never set to "unknown" or "unavailable"
+            if state.state in [SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN]:
+                self.current_season = state.state
+            
             self.season_arrival_date = state.attributes.get("Ankomstdatum")
             
-            # Restore counts (Clean Version)
-            for s in [SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN]:
-                val = state.attributes.get(f"{s}dygn")
+            # Restore all season counters
+            for season, limit in [(SEASON_WINTER, 5), (SEASON_SPRING, 7), (SEASON_SUMMER, 5), (SEASON_AUTUMN, 5)]:
+                val = state.attributes.get(f"{season}dygn")
                 if val:
                     try:
-                        self.consecutive_days = int(val.split('/')[0])
+                        count = int(val.split('/')[0])
+                        self.season_counters[season] = count
                     except (ValueError, IndexError):
-                        self.consecutive_days = 0
+                        self.season_counters[season] = 0
 
             # Only restore dates if NOT set manually in setup
             for s in [SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER]:
-                if self.arrival_dates[s] is None:
+                if not self.manual_dates[s]:
                     # Restore from DB
                     key = f"{s}s ankomstdatum" if s != SEASON_WINTER else "Vinterns ankomstdatum"
-                    self.arrival_dates[s] = state.attributes.get(key)
+                    restored_date = state.attributes.get(key)
+                    if restored_date:
+                        self.arrival_dates[s] = restored_date
 
+        _LOGGER.info("SMHI Season sensor initialized. Current season: %s", self.current_season)
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)
 
     async def _daily_check(self, now):
+        """Daily check at midnight to process temperature data."""
+        _LOGGER.info("=== Starting daily season check at %s ===", now.isoformat())
+        
         # Calculate start and end of yesterday
         yesterday = now - timedelta(days=1)
         start_time = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         end_time = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        _LOGGER.debug("Fetching temperature data for %s (from %s to %s)", 
+                     yesterday.date(), start_time, end_time)
 
         from homeassistant.components.recorder import history
         
@@ -233,74 +250,172 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 pass
 
         if not temps:
-            _LOGGER.warning("No temperature data found for yesterday for %s", self._temp_sensor_id)
+            _LOGGER.warning("No temperature data found for %s from sensor %s. Skipping daily check.", 
+                          yesterday.date(), self._temp_sensor_id)
             return
 
         avg_temp = statistics.mean(temps)
         self.daily_avg_temp = avg_temp
         self.last_update = now.isoformat()
         
+        _LOGGER.info("Average temperature for %s was %.1f°C (from %d readings)", 
+                    yesterday.date(), avg_temp, len(temps))
+        
         self._process_smhi_logic(avg_temp, now.date())
         self.async_write_ha_state()
+        
+        _LOGGER.info("=== Daily season check completed ===")
+
 
     def _process_smhi_logic(self, avg_temp, today_date):
+        """Process SMHI meteorological season logic with comprehensive logging."""
         # Use yesterday's date for logic (since temp is from yesterday)
         data_date = today_date - timedelta(days=1)
-        next_season = self.target_season()
-        criteria_met = False
-        days_needed = 5
-
-        if next_season == SEASON_SPRING:
-            days_needed = 7
-            # > 0.0°C. Earliest Feb 15. Latest Jul 31.
-            is_valid_date = (data_date.month > 2 or (data_date.month == 2 and data_date.day >= 15)) and \
-                            (data_date.month < 7 or (data_date.month == 7 and data_date.day <= 31))
-            if avg_temp > 0.0 and is_valid_date:
-                criteria_met = True
-
-        elif next_season == SEASON_SUMMER:
-            days_needed = 5
-            # >= 10.0°C.
-            if avg_temp >= 10.0:
-                criteria_met = True
-
-        elif next_season == SEASON_AUTUMN:
-            days_needed = 5
-            # < 10.0°C. Earliest Aug 1. Latest Feb 14.
-            is_valid_date = (data_date.month >= 8) or \
-                            (data_date.month < 2 or (data_date.month == 2 and data_date.day <= 14))
-            if avg_temp < 10.0 and is_valid_date:
-                criteria_met = True
-
-        elif next_season == SEASON_WINTER:
-            days_needed = 5
-            # <= 0.0°C.
-            if avg_temp <= 0.0:
-                criteria_met = True
-
-        if criteria_met:
-            self.consecutive_days += 1
+        
+        _LOGGER.info("Processing season logic for date %s with avg temp %.1f°C. Current season: %s",
+                    data_date, avg_temp, self.current_season)
+        
+        # Check for year rollover - if we're in a new year and all dates are from previous year
+        self._check_year_rollover(data_date)
+        
+        # Track which seasons meet criteria today
+        seasons_criteria = {}
+        
+        # Check WINTER criteria: <= 0.0°C, 5 days needed
+        if avg_temp <= 0.0:
+            seasons_criteria[SEASON_WINTER] = True
+            self.season_counters[SEASON_WINTER] += 1
+            _LOGGER.debug("Winter criteria met (%.1f°C <= 0.0°C). Counter: %d/5",
+                         avg_temp, self.season_counters[SEASON_WINTER])
         else:
-            self.consecutive_days = 0
+            if self.season_counters[SEASON_WINTER] > 0:
+                _LOGGER.debug("Winter criteria NOT met (%.1f°C > 0.0°C). Resetting counter from %d to 0",
+                             avg_temp, self.season_counters[SEASON_WINTER])
+            self.season_counters[SEASON_WINTER] = 0
+        
+        # Check SPRING criteria: > 0.0°C, earliest Feb 15, latest Jul 31, 7 days needed
+        is_valid_spring_date = (data_date.month > 2 or (data_date.month == 2 and data_date.day >= 15)) and \
+                               (data_date.month < 7 or (data_date.month == 7 and data_date.day <= 31))
+        if avg_temp > 0.0 and is_valid_spring_date:
+            seasons_criteria[SEASON_SPRING] = True
+            self.season_counters[SEASON_SPRING] += 1
+            _LOGGER.debug("Spring criteria met (%.1f°C > 0.0°C, date valid). Counter: %d/7",
+                         avg_temp, self.season_counters[SEASON_SPRING])
+        else:
+            if self.season_counters[SEASON_SPRING] > 0:
+                reason = "temp too low" if avg_temp <= 0.0 else "date out of range"
+                _LOGGER.debug("Spring criteria NOT met (%.1f°C, %s). Resetting counter from %d to 0",
+                             avg_temp, reason, self.season_counters[SEASON_SPRING])
+            self.season_counters[SEASON_SPRING] = 0
+        
+        # Check SUMMER criteria: >= 10.0°C, 5 days needed
+        if avg_temp >= 10.0:
+            seasons_criteria[SEASON_SUMMER] = True
+            self.season_counters[SEASON_SUMMER] += 1
+            _LOGGER.debug("Summer criteria met (%.1f°C >= 10.0°C). Counter: %d/5",
+                         avg_temp, self.season_counters[SEASON_SUMMER])
+        else:
+            if self.season_counters[SEASON_SUMMER] > 0:
+                _LOGGER.debug("Summer criteria NOT met (%.1f°C < 10.0°C). Resetting counter from %d to 0",
+                             avg_temp, self.season_counters[SEASON_SUMMER])
+            self.season_counters[SEASON_SUMMER] = 0
+        
+        # Check AUTUMN criteria: < 10.0°C, earliest Aug 1, latest Feb 14, 5 days needed
+        is_valid_autumn_date = (data_date.month >= 8) or \
+                               (data_date.month < 2 or (data_date.month == 2 and data_date.day <= 14))
+        if avg_temp < 10.0 and is_valid_autumn_date:
+            seasons_criteria[SEASON_AUTUMN] = True
+            self.season_counters[SEASON_AUTUMN] += 1
+            _LOGGER.debug("Autumn criteria met (%.1f°C < 10.0°C, date valid). Counter: %d/5",
+                         avg_temp, self.season_counters[SEASON_AUTUMN])
+        else:
+            if self.season_counters[SEASON_AUTUMN] > 0:
+                reason = "temp too high" if avg_temp >= 10.0 else "date out of range"
+                _LOGGER.debug("Autumn criteria NOT met (%.1f°C, %s). Resetting counter from %d to 0",
+                             avg_temp, reason, self.season_counters[SEASON_AUTUMN])
+            self.season_counters[SEASON_AUTUMN] = 0
+        
+        # Check if any season threshold is reached
+        season_thresholds = {
+            SEASON_WINTER: 5,
+            SEASON_SPRING: 7,
+            SEASON_SUMMER: 5,
+            SEASON_AUTUMN: 5,
+        }
+        
+        for season, threshold in season_thresholds.items():
+            if self.season_counters[season] >= threshold:
+                if self.manual_dates[season]:
+                    _LOGGER.info("%s threshold reached (%d/%d days), but %s date is manually set. NOT updating.",
+                               season, self.season_counters[season], threshold, season)
+                    # Reset counter since we've "reached" the season
+                    self.season_counters[season] = 0
+                elif self.arrival_dates[season] is not None:
+                    _LOGGER.info("%s threshold reached (%d/%d days), but %s date already set this year. NOT updating.",
+                               season, self.season_counters[season], threshold, season)
+                    # Reset counter since we've already recorded this season
+                    self.season_counters[season] = 0
+                else:
+                    # Trigger season change
+                    self._change_season(season, threshold, data_date)
+    
+    def _change_season(self, new_season, days_needed, data_date):
+        """Handle changing to a new season."""
+        _LOGGER.info("=== SEASON CHANGE TRIGGERED: %s -> %s ===", self.current_season, new_season)
+        
+        # Move current season date to history sensor before overwriting
+        if self.arrival_dates[new_season]:
+            self._history_sensor.update_history(new_season, self.arrival_dates[new_season])
+            _LOGGER.info("Moved previous %s date to history: %s", new_season, self.arrival_dates[new_season])
 
-        # Check for Season Change
-        if self.consecutive_days >= days_needed:
-            # Move current season date to history sensor before overwriting
-            if self.arrival_dates[next_season]:
-                 self._history_sensor.update_history(next_season, self.arrival_dates[next_season])
-
-            # Change Season
-            self.current_season = next_season
-            
-            # Arrival date is the first day of the sequence
-            arrival = data_date - timedelta(days=days_needed - 1)
-            formatted_date = self._format_date_swedish(arrival)
-            
-            self.season_arrival_date = formatted_date
-            self.arrival_dates[next_season] = formatted_date
-            
-            # Reset counter
-            self.consecutive_days = 0
+        # Change Season
+        self.current_season = new_season
+        
+        # Arrival date is the first day of the sequence
+        arrival = data_date - timedelta(days=days_needed - 1)
+        formatted_date = self._format_date_swedish(arrival)
+        
+        self.season_arrival_date = formatted_date
+        self.arrival_dates[new_season] = formatted_date
+        
+        _LOGGER.info("Season changed to %s. Arrival date: %s", new_season, formatted_date)
+        
+        # Reset counter
+        self.season_counters[new_season] = 0
+    
+    def _check_year_rollover(self, current_date):
+        """Check if we need to rollover dates to history for a new year."""
+        current_year = current_date.year
+        
+        # Check if any arrival dates exist
+        has_dates = any(date_str is not None for date_str in self.arrival_dates.values())
+        if not has_dates:
+            return
+        
+        # Check if all dates are from a previous year
+        all_dates_old = True
+        for season, date_str in self.arrival_dates.items():
+            if date_str:
+                # Parse the Swedish date format
+                try:
+                    # Extract year from format like "15 januari 2025"
+                    parts = date_str.split()
+                    if len(parts) >= 3:
+                        year = int(parts[-1])
+                        if year == current_year:
+                            all_dates_old = False
+                            break
+                except (ValueError, IndexError):
+                    continue
+        
+        # If all dates are from previous year, move them to history and clear for new year
+        if all_dates_old:
+            _LOGGER.info("Year rollover detected. Moving all dates to history for year %d", current_year)
+            for season, date_str in self.arrival_dates.items():
+                if date_str and not self.manual_dates[season]:
+                    self._history_sensor.update_history(season, date_str)
+                    self.arrival_dates[season] = None
+                    _LOGGER.info("Moved %s date to history: %s", season, date_str)
 
     def _format_date_swedish(self, date_obj):
         months = [
