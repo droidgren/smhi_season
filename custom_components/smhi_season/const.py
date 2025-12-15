@@ -15,3 +15,11 @@ SEASON_SPRING = "Vår"
 SEASON_SUMMER = "Sommar"
 SEASON_AUTUMN = "Höst"
 SEASON_UNKNOWN = "Okänd"
+
+# Season thresholds (number of consecutive days needed for each season)
+SEASON_THRESHOLDS = {
+    "Vinter": 5,
+    "Vår": 7,
+    "Sommar": 5,
+    "Höst": 5,
+}

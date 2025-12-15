@@ -23,6 +23,7 @@ from .const import (
     SEASON_SUMMER,
     SEASON_AUTUMN,
     SEASON_UNKNOWN,
+    SEASON_THRESHOLDS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -167,10 +168,10 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "Ankomstdatum": self.season_arrival_date,
             "Förra dygnets medeltemp": f"{self.daily_avg_temp:.1f}°C" if self.daily_avg_temp is not None else None,
             "Senast uppdaterad": self.last_update,
-            "Vinterdygn": f"{self.season_counters[SEASON_WINTER]}/5",
-            "Vårdygn": f"{self.season_counters[SEASON_SPRING]}/7",
-            "Sommardygn": f"{self.season_counters[SEASON_SUMMER]}/5",
-            "Höstdygn": f"{self.season_counters[SEASON_AUTUMN]}/5",
+            "Vinterdygn": f"{self.season_counters[SEASON_WINTER]}/{SEASON_THRESHOLDS[SEASON_WINTER]}",
+            "Vårdygn": f"{self.season_counters[SEASON_SPRING]}/{SEASON_THRESHOLDS[SEASON_SPRING]}",
+            "Sommardygn": f"{self.season_counters[SEASON_SUMMER]}/{SEASON_THRESHOLDS[SEASON_SUMMER]}",
+            "Höstdygn": f"{self.season_counters[SEASON_AUTUMN]}/{SEASON_THRESHOLDS[SEASON_AUTUMN]}",
             "Vårens ankomstdatum": self.arrival_dates[SEASON_SPRING],
             "Sommarens ankomstdatum": self.arrival_dates[SEASON_SUMMER],
             "Höstens ankomstdatum": self.arrival_dates[SEASON_AUTUMN],
@@ -188,7 +189,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             self.season_arrival_date = state.attributes.get("Ankomstdatum")
             
             # Restore all season counters
-            for season, limit in [(SEASON_WINTER, 5), (SEASON_SPRING, 7), (SEASON_SUMMER, 5), (SEASON_AUTUMN, 5)]:
+            for season in [SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN]:
                 val = state.attributes.get(f"{season}dygn")
                 if val:
                     try:
@@ -336,14 +337,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             self.season_counters[SEASON_AUTUMN] = 0
         
         # Check if any season threshold is reached
-        season_thresholds = {
-            SEASON_WINTER: 5,
-            SEASON_SPRING: 7,
-            SEASON_SUMMER: 5,
-            SEASON_AUTUMN: 5,
-        }
-        
-        for season, threshold in season_thresholds.items():
+        for season, threshold in SEASON_THRESHOLDS.items():
             if self.season_counters[season] >= threshold:
                 if self.manual_dates[season]:
                     _LOGGER.info("%s threshold reached (%d/%d days), but %s date is manually set. NOT updating.",
