@@ -25,19 +25,13 @@
     "options": {
         "step": {
             "init": {
-                "menu_options": {
-                    "sensor_settings": "Inställningar för Sensor",
-                    "history_settings": "Inställningar för Historik"
-                }
-            },
-            "sensor_settings": {
-                "title": "Sensorinställningar",
                 "data": {
-                    "temperature_sensor": "Temperatursensor (Utomhus)"
+                    "temperature_sensor": "Temperatursensor (Utomhus)",
+                    "edit_history": "Konfigurera historiska datum"
                 }
             },
             "history_settings": {
-                "title": "Historiska Datum",
+                "title": "Ange tidigare datum (Valfritt)",
                 "description": "Ändra eller rensa historiska datum.",
                 "data": {
                     "history_spring": "Senaste datum för Vår",

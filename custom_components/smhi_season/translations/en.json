@@ -25,19 +25,13 @@
     "options": {
         "step": {
             "init": {
-                "menu_options": {
-                    "sensor_settings": "Sensor Settings",
-                    "history_settings": "History Settings"
-                }
-            },
-            "sensor_settings": {
-                "title": "Sensor Settings",
                 "data": {
-                    "temperature_sensor": "Temperature Sensor (Outdoor)"
+                    "temperature_sensor": "Temperature Sensor (Outdoor)",
+                    "edit_history": "Configure historical dates"
                 }
             },
             "history_settings": {
-                "title": "Historical Dates",
+                "title": "Set previous dates (Optional)",
                 "description": "Change or clear historical dates.",
                 "data": {
                     "history_spring": "Latest date for Spring",
