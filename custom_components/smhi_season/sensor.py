@@ -73,6 +73,9 @@ async def async_setup_entry(
 
 class SmhiHistorySensor(RestoreSensor, SensorEntity):
     """Sensor showing historical arrival dates."""
+    
+    # Event-driven sensor, disable polling
+    _attr_should_poll = False
 
     def __init__(self, entry_id):
         self._attr_name = "Meteorologisk årstid historisk"
@@ -106,10 +109,14 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
         if season == SEASON_WINTER:
             key = "Vinterns ankomstdatum"
         self._state_attributes[key] = date_str
+        self.async_write_ha_state()
 
 
 class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     """Main sensor calculating the meteorological season."""
+    
+    # Event-driven sensor, disable polling to prevent "unavailable" checks
+    _attr_should_poll = False
 
     def __init__(self, hass, entry_id, temp_sensor_id, history_sensor):
         self.hass = hass
@@ -206,6 +213,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         if (state := await self.async_get_last_state()) is not None:
             self.current_season = state.state
             
+            # This logic ensures that if the previous state was "unavailable", we default to "Okänd"
             if self.current_season in ("unknown", "unavailable", None):
                 self.current_season = SEASON_UNKNOWN
             
@@ -338,13 +346,13 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         for season, is_day in criteria_map.items():
             if is_day:
                 new_counts[season] = self.consecutive_counts[season] + 1
-                _LOGGER.debug(
+                _Logger.info(
                     "[%s] Criteria met for '%s'. Counter increased to %d/%d.",
                     data_date, season, new_counts[season], self.days_needed[season]
                 )
             else:
                 if self.consecutive_counts[season] > 0:
-                    _LOGGER.debug(
+                    _Logger.info(
                         "[%s] Criteria NOT met for '%s'. Counter reset from %d to 0.",
                         data_date, season, self.consecutive_counts[season]
                     )
