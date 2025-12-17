@@ -1,4 +1,4 @@
-# <img src="custom_components/icon.png" width="64" align="left" alt="Logo"> Meteorologisk Årstid (SMHI) for Home Assistant
+# <img src="https://github.com/droidgren/smhi_season/blob/main/custom_components/icon.png?raw=true" width="64" align="left" alt="Logo"> Meteorologisk Årstid (SMHI) for Home Assistant
 
 A custom integration that calculates the meteorological season based on SMHI (Swedish Meteorological and Hydrological Institute) definitions.
 
@@ -35,8 +35,8 @@ A custom integration that calculates the meteorological season based on SMHI (Sw
 ## Attributes
 The main sensor provides:
 - **Ankomstdatum:** Date the current season started.
-- **Vinterdygn X/5:** Progress towards Winter.
-- **Vårdygn X/7:** Progress towards Spring.
-- **Sommardygn X/5:** Progress towards Summer.
-- **Höstdygn X/5:** Progress towards Autumn.
+- **Vinterdygn 0/5:** Progress towards Winter.
+- **Vårdygn 0/7:** Progress towards Spring.
+- **Sommardygn 0/5:** Progress towards Summer.
+- **Höstdygn 0/5:** Progress towards Autumn.
 - **Förra dygnets medeltemp:** The calculated average used for the logic.
