@@ -346,13 +346,13 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         for season, is_day in criteria_map.items():
             if is_day:
                 new_counts[season] = self.consecutive_counts[season] + 1
-                _Logger.info(
+                _LOGGER.info(
                     "[%s] Criteria met for '%s'. Counter increased to %d/%d.",
                     data_date, season, new_counts[season], self.days_needed[season]
                 )
             else:
                 if self.consecutive_counts[season] > 0:
-                    _Logger.info(
+                    _LOGGER.info(
                         "[%s] Criteria NOT met for '%s'. Counter reset from %d to 0.",
                         data_date, season, self.consecutive_counts[season]
                     )
