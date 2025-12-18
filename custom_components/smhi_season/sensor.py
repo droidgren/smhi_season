@@ -37,8 +37,10 @@ async def async_setup_entry(
     config = {**entry.data, **entry.options}
     temp_sensor_id = config.get(CONF_TEMPERATURE_SENSOR)
     
+    # Initialize all three sensors
     history_sensor = SmhiHistorySensor(entry.entry_id)
-    main_sensor = SmhiSeasonSensor(hass, entry.entry_id, temp_sensor_id, history_sensor)
+    log_sensor = SmhiLogSensor(entry.entry_id)
+    main_sensor = SmhiSeasonSensor(hass, entry.entry_id, temp_sensor_id, history_sensor, log_sensor)
 
     current_year = date.today().year
     
@@ -65,16 +67,34 @@ async def async_setup_entry(
                 else:
                     history_sensor.update_history(season, formatted_date)
             except ValueError:
-                _LOGGER.warning("Invalid date format for %s: %s", season, date_str)
+                # Log warning to system and logbook (if available)
+                await main_sensor._log_warning("Invalid date format for %s: %s", season, date_str)
                 continue
 
-    async_add_entities([main_sensor, history_sensor])
+    async_add_entities([main_sensor, history_sensor, log_sensor])
+
+
+class SmhiLogSensor(SensorEntity):
+    """Sensor specifically for logbook entries."""
+    
+    _attr_should_poll = False
+
+    def __init__(self, entry_id):
+        self._attr_name = "Meteorologisk årstid logg"
+        self._attr_unique_id = f"{entry_id}_log"
+        self._attr_has_entity_name = True
+        self._attr_icon = "mdi:script-text-outline"
+        self._attr_native_value = "Inga händelser"
+
+    def update_timestamp(self):
+        """Update the state to show when the last log happened."""
+        self._attr_native_value = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.async_write_ha_state()
 
 
 class SmhiHistorySensor(RestoreSensor, SensorEntity):
     """Sensor showing historical arrival dates."""
     
-    # Event-driven sensor, disable polling
     _attr_should_poll = False
 
     def __init__(self, entry_id):
@@ -115,13 +135,13 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
 class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     """Main sensor calculating the meteorological season."""
     
-    # Event-driven sensor, disable polling to prevent "unavailable" checks
     _attr_should_poll = False
 
-    def __init__(self, hass, entry_id, temp_sensor_id, history_sensor):
+    def __init__(self, hass, entry_id, temp_sensor_id, history_sensor, log_sensor):
         self.hass = hass
         self._temp_sensor_id = temp_sensor_id
         self._history_sensor = history_sensor
+        self._log_sensor = log_sensor
         
         self._attr_name = "Meteorologisk årstid"
         self._attr_unique_id = f"{entry_id}_main"
@@ -168,7 +188,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         """Set arrival date manually from config (or clear it)."""
         self.arrival_dates[season] = date_str
         
-        # If date is None, it means we are Resetting to Auto, so Flag = False
         if date_str is not None:
             self._manual_flags[season] = True
         else:
@@ -213,7 +232,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         if (state := await self.async_get_last_state()) is not None:
             self.current_season = state.state
             
-            # This logic ensures that if the previous state was "unavailable", we default to "Okänd"
             if self.current_season in ("unknown", "unavailable", None):
                 self.current_season = SEASON_UNKNOWN
             
@@ -234,24 +252,18 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             
             if saved_flags:
                 for s in self._manual_flags:
-                    # Only restore flag if we didn't explicitly configure it in this setup
                     if s not in self._configured_seasons and s in saved_flags:
                         self._manual_flags[s] = saved_flags[s]
 
             # Restore Dates Logic
             for s in self.arrival_dates.keys():
-                # If we configured/reset this season in this boot, SKIP restoration
                 if s in self._configured_seasons:
                     continue
 
                 if self.arrival_dates[s] is None:
-                    # Date is NOT in current config 
-                    
                     was_manual = self._manual_flags.get(s, False)
-                    
                     should_restore = True
                     if was_manual:
-                         # It was manual before, but config is None -> User Reset it.
                          should_restore = False
                     elif not has_history:
                          should_restore = False 
@@ -270,6 +282,40 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         self._manual_flags[s] = False
 
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)
+
+    # --- Logging Helpers ---
+
+    async def _log_info(self, message, *args):
+        """Log INFO to system logger and Log entity."""
+        _LOGGER.info(message, *args)
+        await self._send_to_logbook(message, *args)
+
+    async def _log_warning(self, message, *args):
+        """Log WARNING to system logger and Log entity."""
+        _LOGGER.warning(message, *args)
+        await self._send_to_logbook(message, *args)
+
+    async def _send_to_logbook(self, message, *args):
+        """Format message and send to logbook service if log sensor is available."""
+        # Only check/send if log sensor is fully set up (has hass and entity_id)
+        # This prevents errors during the initial setup phase (async_setup_entry)
+        if self._log_sensor and self._log_sensor.hass and self._log_sensor.entity_id:
+            try:
+                formatted_message = message % args
+            except Exception:
+                formatted_message = message
+            
+            self._log_sensor.update_timestamp()
+            await self.hass.services.async_call(
+                "logbook", "log",
+                {
+                    "name": self._log_sensor.name,
+                    "message": formatted_message,
+                    "entity_id": self._log_sensor.entity_id,
+                }
+            )
+
+    # --- Main Logic ---
 
     async def _daily_check(self, now):
         yesterday = now - timedelta(days=1)
@@ -303,20 +349,21 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 pass
 
         if not temps:
-            _LOGGER.warning("[%s] No temperature data found for yesterday for %s", yesterday.date(), self._temp_sensor_id)
+            # Replaced direct logger call with _log_warning
+            await self._log_warning("[%s] No temperature data found for yesterday for %s", yesterday.date(), self._temp_sensor_id)
             return
 
         avg_temp = statistics.mean(temps)
         self.daily_avg_temp = avg_temp
         self.last_update = now.isoformat()
         
-        self._process_smhi_logic(avg_temp, now.date())
+        await self._process_smhi_logic(avg_temp, now.date())
         self.async_write_ha_state()
 
-    def _process_smhi_logic(self, avg_temp, today_date):
+    async def _process_smhi_logic(self, avg_temp, today_date):
         data_date = today_date - timedelta(days=1)
         
-        _LOGGER.info(
+        await self._log_info(
             "[%s] Daily check started. Average temperature was %.1f°C. Current Season: %s",
             data_date, avg_temp, self.current_season
         )
@@ -346,13 +393,13 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         for season, is_day in criteria_map.items():
             if is_day:
                 new_counts[season] = self.consecutive_counts[season] + 1
-                _LOGGER.info(
+                await self._log_info(
                     "[%s] Criteria met for '%s'. Counter increased to %d/%d.",
                     data_date, season, new_counts[season], self.days_needed[season]
                 )
             else:
                 if self.consecutive_counts[season] > 0:
-                    _LOGGER.info(
+                    await self._log_info(
                         "[%s] Criteria NOT met for '%s'. Counter reset from %d to 0.",
                         data_date, season, self.consecutive_counts[season]
                     )
@@ -367,7 +414,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             if count >= days_needed_for_season:
                 
                 if season != next_season:
-                    _LOGGER.info(
+                    await self._log_info(
                         "[%s] Criteria met for '%s' (%d/%d), but logical next season is '%s'. Transition blocked.",
                         data_date, season, count, days_needed_for_season, next_season
                     )
@@ -384,12 +431,12 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         diff = arrival_dt - existing_dt
                         if diff.days < 180 and diff.days > -180:
                             should_update = False
-                            _LOGGER.info(
+                            await self._log_info(
                                 "[%s] *** Season change SKIPPED ***: Criteria met for '%s', but date is already set recently (%s).",
                                 data_date, season, existing_date_str
                             )
                         else:
-                            _LOGGER.info(
+                            await self._log_info(
                                 "[%s] Existing date for '%s' (%s) is old. Moving to history and updating.",
                                 data_date, season, existing_date_str
                             )
@@ -404,7 +451,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     
                     self._manual_flags[season] = False
                     
-                    _LOGGER.info(
+                    await self._log_info(
                         "[%s] *** SEASON CHANGE ***: Transitioned to '%s'. Arrival date set to %s.",
                         data_date, season, formatted_date
                     )
@@ -413,7 +460,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 else:
                     self.consecutive_counts[season] = 0
 
-        _LOGGER.info(
+        await self._log_info(
             "[%s] Daily check finished. Current Season: %s, Next Target: %s, Transition Counters: %s",
             data_date, self.current_season, self.target_season(), dict(self.consecutive_counts)
         )
