@@ -299,61 +299,53 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)
 
     async def _find_last_frost_date(self):
-        """Check history for the last frost date."""
-        # Use a background task to not block startup
-        from homeassistant.components.recorder import history
-
-        # Search chunks going backwards
-        # 0 = Search "Now to Now-5d"
-        # 5 = Search "Now-5d to Now-10d"
-        start_day_offset = 0
-        chunk_days = 5
-        max_lookback = 100 # Look back 100 days maximum
+        """Check Long Term Statistics for the last frost date."""
+        from homeassistant.components.recorder import statistics
 
         now = dt_util.now()
+        
+        # Search LONG TERM statistics (up to 180 days)
+        # We skip detailed history as requested.
+        long_term_days = 180
+        stats_start = now - timedelta(days=long_term_days)
+        stats_end = now
 
-        while start_day_offset < max_lookback:
-            # Check if we already found it (e.g. set by daily update race condition)
-            if self.days_since_frost is not None:
-                return
+        stats = await self.hass.async_add_executor_job(
+            statistics.statistics_during_period,
+            self.hass,
+            stats_start,
+            stats_end,
+            [self._temp_sensor_id],
+            "hour",
+            None,
+            {"min"}
+        )
+        
+        if self._temp_sensor_id in stats:
+            # Stats are chronological. Reverse to find latest.
+            for stat in reversed(stats[self._temp_sensor_id]):
+                val = stat.get("min")
+                if val is not None and val <= 0:
+                    ts = stat.get("start")
+                    if isinstance(ts, (int, float)):
+                        stat_dt = datetime.fromtimestamp(ts, dt_util.DEFAULT_TIME_ZONE)
+                    else:
+                        stat_dt = ts
+                    
+                    if stat_dt:
+                        # Ensure timezone awareness
+                        if stat_dt.tzinfo is None:
+                            stat_dt = stat_dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
 
-            end_date = now - timedelta(days=start_day_offset)
-            start_date = now - timedelta(days=start_day_offset + chunk_days)
-            
-            # Start/End of the period
-            events = await self.hass.async_add_executor_job(
-                history.state_changes_during_period,
-                self.hass,
-                start_date,
-                end_date,
-                self._temp_sensor_id,
-            )
+                        diff = (now - stat_dt).days
+                        if diff < 0: diff = 0
+                        
+                        if self.days_since_frost is None:
+                            self.days_since_frost = diff
+                            self.async_write_ha_state()
+                            await self._log_info("Restored 'Dagar sedan frost' from Long Term Statistics: %d days ago (%s)", diff, stat_dt.date())
+                        return
 
-            if self._temp_sensor_id in events:
-                # Events are chronological. Reverse to find the latest frost in this chunk.
-                for state in reversed(events[self._temp_sensor_id]):
-                    try:
-                         # Filter out non-numeric
-                        if state.state in ("unknown", "unavailable"):
-                            continue
-                        temp = float(state.state)
-                        if temp <= 0:
-                            # Found it!
-                            frost_time = state.last_updated
-                            # Difference in days from "now"
-                            diff = (now - frost_time).days
-                            if diff < 0: diff = 0 # Safety
-                            
-                            # Only set if still None
-                            if self.days_since_frost is None:
-                                self.days_since_frost = diff
-                                self.async_write_ha_state()
-                                await self._log_info("Restored 'Dagar sedan frost' from history: %d days ago (%s)", diff, frost_time.date())
-                            return
-                    except ValueError:
-                        pass
-            
-            start_day_offset += chunk_days
 
     # --- Logging Helpers ---
 
