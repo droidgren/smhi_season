@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
@@ -159,6 +160,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
         self.last_update = None
         self.daily_avg_temp = None
+        self.days_since_frost = None
 
         self.arrival_dates = {
             SEASON_SPRING: None,
@@ -208,6 +210,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "Ankomstdatum": self.season_arrival_date,
             "Förra dygnets medeltemp": f"{self.daily_avg_temp:.1f}°C" if self.daily_avg_temp is not None else None,
             "Senast uppdaterad": self.last_update,
+            "Dagar sedan frost": self.days_since_frost,
             "Vinterdygn": get_count(SEASON_WINTER, self.days_needed[SEASON_WINTER]),
             "Vårdygn": get_count(SEASON_SPRING, self.days_needed[SEASON_SPRING]),
             "Sommardygn": get_count(SEASON_SUMMER, self.days_needed[SEASON_SUMMER]),
@@ -246,6 +249,14 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     except (ValueError, IndexError):
                         self.consecutive_counts[s] = 0
 
+            # Restore Days Since Frost
+            frost_val = state.attributes.get("Dagar sedan frost")
+            if frost_val is not None:
+                try:
+                    self.days_since_frost = int(frost_val)
+                except (ValueError, TypeError):
+                    self.days_since_frost = None
+
             # Restore Manual Flags
             saved_flags = state.attributes.get("manual_flags", {})
             has_history = len(saved_flags) > 0 
@@ -281,7 +292,68 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     else:
                         self._manual_flags[s] = False
 
+        # If frost days is unknown, try to find it in history (background task)
+        if self.days_since_frost is None:
+            self.hass.async_create_task(self._find_last_frost_date())
+
         async_track_time_change(self.hass, self._daily_check, hour=0, minute=0, second=10)
+
+    async def _find_last_frost_date(self):
+        """Check history for the last frost date."""
+        # Use a background task to not block startup
+        from homeassistant.components.recorder import history
+
+        # Search chunks going backwards
+        # 0 = Search "Now to Now-5d"
+        # 5 = Search "Now-5d to Now-10d"
+        start_day_offset = 0
+        chunk_days = 5
+        max_lookback = 100 # Look back 100 days maximum
+
+        now = dt_util.now()
+
+        while start_day_offset < max_lookback:
+            # Check if we already found it (e.g. set by daily update race condition)
+            if self.days_since_frost is not None:
+                return
+
+            end_date = now - timedelta(days=start_day_offset)
+            start_date = now - timedelta(days=start_day_offset + chunk_days)
+            
+            # Start/End of the period
+            events = await self.hass.async_add_executor_job(
+                history.state_changes_during_period,
+                self.hass,
+                start_date,
+                end_date,
+                self._temp_sensor_id,
+            )
+
+            if self._temp_sensor_id in events:
+                # Events are chronological. Reverse to find the latest frost in this chunk.
+                for state in reversed(events[self._temp_sensor_id]):
+                    try:
+                         # Filter out non-numeric
+                        if state.state in ("unknown", "unavailable"):
+                            continue
+                        temp = float(state.state)
+                        if temp <= 0:
+                            # Found it!
+                            frost_time = state.last_updated
+                            # Difference in days from "now"
+                            diff = (now - frost_time).days
+                            if diff < 0: diff = 0 # Safety
+                            
+                            # Only set if still None
+                            if self.days_since_frost is None:
+                                self.days_since_frost = diff
+                                self.async_write_ha_state()
+                                await self._log_info("Restored 'Dagar sedan frost' from history: %d days ago (%s)", diff, frost_time.date())
+                            return
+                    except ValueError:
+                        pass
+            
+            start_day_offset += chunk_days
 
     # --- Logging Helpers ---
 
@@ -354,6 +426,14 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             return
 
         avg_temp = statistics.mean(temps)
+        min_temp = min(temps)
+        
+        # Calculate days since frost
+        if min_temp <= 0.0:
+            self.days_since_frost = 0
+        elif self.days_since_frost is not None:
+            self.days_since_frost += 1
+
         self.daily_avg_temp = avg_temp
         self.last_update = now.isoformat()
         
