@@ -4,6 +4,9 @@
 
 A custom integration that calculates the meteorological season based on SMHI (Swedish Meteorological and Hydrological Institute) definitions.
 
+## Disclaimer
+This project is an independent custom integration and is **not** affiliated with, endorsed by, or connected to **SMHI** (Swedish Meteorological and Hydrological Institute) in any way. It simply uses their public meteorological definitions to calculate seasons.
+
 ## Features
 - Calculates daily average temperature automatically.
 - Tracks consecutive days to determine season changes.
@@ -37,6 +40,7 @@ A custom integration that calculates the meteorological season based on SMHI (Sw
 ## Attributes
 The main sensor provides:
 - **Ankomstdatum:** Date the current season started.
+- **Dagar sedan frost:** Number of days since the last frost (daily minimum temperature ≤ 0°C).
 - **Vinterdygn 0/5:** Progress towards Winter.
 - **Vårdygn 0/7:** Progress towards Spring.
 - **Sommardygn 0/5:** Progress towards Summer.
