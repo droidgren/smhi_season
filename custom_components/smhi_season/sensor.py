@@ -490,7 +490,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
                 if season != next_season and not is_green_winter:
                     await self._log_info(
-                        "[%s] Criteria met for '%s' (%d/%d), but logical next season is '%s'. Transition blocked.",
+                        "[%s] Criteria met for '%s' (%d/%d). Transition blocked: Logical next season is '%s' and Green Winter exception (Autumn -> Spring) does not apply.",
                         data_date, season, count, days_needed_for_season, next_season
                     )
                     continue 
