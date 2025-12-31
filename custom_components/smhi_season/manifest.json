@@ -1,6 +1,6 @@
 {
   "domain": "smhi_season",
-  "name": "Meteorologisk årstid enligt SMHI",
+  "name": "Meteorologisk årstid",
   "codeowners": [],
   "config_flow": true,
   "documentation": "https://github.com/droidgren/smhi_season",
