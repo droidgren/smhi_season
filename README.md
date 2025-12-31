@@ -1,6 +1,6 @@
 # $\color{#FF0000}{Work~in~~progress!}$
 
-# ![icon](./custom_components/icon_128.png) Meteorologisk Årstid (SMHI) for Home Assistant
+# ![icon](./custom_components/icon_128.png) Meteorologisk Årstid for Home Assistant
 
 A custom integration that calculates the meteorological season based on SMHI (Swedish Meteorological and Hydrological Institute) definitions.
 
