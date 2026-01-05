@@ -43,8 +43,6 @@ async def async_setup_entry(
     log_sensor = SmhiLogSensor(entry.entry_id)
     main_sensor = SmhiSeasonSensor(hass, entry.entry_id, temp_sensor_id, history_sensor, log_sensor)
 
-    current_year = date.today().year
-    
     date_map = {
         SEASON_SPRING: config.get(CONF_HISTORY_SPRING),
         SEASON_SUMMER: config.get(CONF_HISTORY_SUMMER),
@@ -52,6 +50,7 @@ async def async_setup_entry(
         SEASON_WINTER: config.get(CONF_HISTORY_WINTER),
     }
 
+    # All manually entered dates go to the main sensor, regardless of year
     for season, date_str in date_map.items():
         if date_str:
             if date_str == "MANUAL_RESET":
@@ -62,11 +61,10 @@ async def async_setup_entry(
             try:
                 d_obj = date.fromisoformat(str(date_str))
                 formatted_date = main_sensor._format_date_swedish(d_obj)
-
-                if d_obj.year == current_year:
-                    main_sensor.set_manual_arrival_date(season, formatted_date)
-                else:
-                    history_sensor.update_history(season, formatted_date)
+                
+                # All dates go to main sensor
+                main_sensor.set_manual_arrival_date(season, formatted_date)
+                
             except ValueError:
                 # Log warning to system and logbook (if available)
                 await main_sensor._log_warning("Invalid date format for %s: %s", season, date_str)
@@ -94,7 +92,7 @@ class SmhiLogSensor(SensorEntity):
 
 
 class SmhiHistorySensor(RestoreSensor, SensorEntity):
-    """Sensor showing historical arrival dates."""
+    """Sensor showing historical arrival dates (previous cycle)."""
     
     _attr_should_poll = False
 
@@ -125,23 +123,21 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
                     self._state_attributes[k] = v
 
     def update_history(self, season, date_str):
-            """Update a specific historical date."""
-            # Mappa säsongskonstanterna till de korrekta attributnycklarna
-            key_map = {
-                SEASON_SPRING: "Vårens ankomstdatum",
-                SEASON_SUMMER: "Sommarens ankomstdatum",
-                SEASON_AUTUMN: "Höstens ankomstdatum",
-                SEASON_WINTER: "Vinterns ankomstdatum",
-            }
+        """Update a specific historical date (called when main sensor date changes)."""
+        key_map = {
+            SEASON_SPRING: "Vårens ankomstdatum",
+            SEASON_SUMMER: "Sommarens ankomstdatum",
+            SEASON_AUTUMN: "Höstens ankomstdatum",
+            SEASON_WINTER: "Vinterns ankomstdatum",
+        }
+        
+        key = key_map.get(season)
+        
+        if key:
+            self._state_attributes[key] = date_str
             
-            key = key_map.get(season)
-            
-            if key:
-                self._state_attributes[key] = date_str
-                
-                # Kontrollera att hass finns innan vi skriver state (fix från förra felet)
-                if self.hass:
-                    self.async_write_ha_state()
+            if self.hass:
+                self.async_write_ha_state()
 
 
 class SmhiSeasonSensor(RestoreSensor, SensorEntity):
@@ -316,7 +312,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         now = dt_util.now()
         
         # Search LONG TERM statistics (up to 180 days)
-        # We skip detailed history as requested.
         long_term_days = 180
         stats_start = now - timedelta(days=long_term_days)
         stats_end = now
@@ -372,8 +367,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     async def _send_to_logbook(self, message, *args):
         """Format message and send to logbook service if log sensor is available."""
-        # Only check/send if log sensor is fully set up (has hass and entity_id)
-        # This prevents errors during the initial setup phase (async_setup_entry)
         if self._log_sensor and self._log_sensor.hass and self._log_sensor.entity_id:
             try:
                 formatted_message = message % args
@@ -424,7 +417,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 pass
 
         if not temps:
-            # Replaced direct logger call with _log_warning
             await self._log_warning("[%s] No temperature data found for yesterday for %s", yesterday.date(), self._temp_sensor_id)
             return
 
@@ -526,6 +518,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                                 "[%s] Existing date for '%s' (%s) is old. Moving to history and updating.",
                                 data_date, season, existing_date_str
                             )
+                            # Move old date to history sensor
                             self._history_sensor.update_history(season, existing_date_str)
                     
                 if should_update:

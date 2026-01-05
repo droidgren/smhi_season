@@ -8,16 +8,16 @@
                 }
             },
             "history": {
-                "title": "Historical Dates (Optional)",
-                "description": "Step 2: \n\nEnter historical dates if you want to set them manually.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days",
+                "title": "Set Past Season Dates (Optional)",
+                "description": "Step 2: \n\nEnter dates for seasons that have already occurred. These dates will be displayed in the main sensor's attributes (sensor.meteorologisk_arstid).\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days\n\n**Note:** When a new season arrives automatically, the old date will be moved to the history sensor (sensor.meteorologisk_arstid_historisk).",
                 "data": {
-                    "history_spring": "Latest date for Spring",
+                    "history_spring": "Date for Spring",
                     "reset_spring": "Clear date for Spring",
-                    "history_summer": "Latest date for Summer",
+                    "history_summer": "Date for Summer",
                     "reset_summer": "Clear date for Summer",
-                    "history_autumn": "Latest date for Autumn",
+                    "history_autumn": "Date for Autumn",
                     "reset_autumn": "Clear date for Autumn",
-                    "history_winter": "Latest date for Winter",
+                    "history_winter": "Date for Winter",
                     "reset_winter": "Clear date for Winter"
                 }
             }
@@ -31,7 +31,7 @@
             "init": {
                 "menu_options": {
                     "sensor_settings": "Sensor Settings",
-                    "history_settings": "Historical Dates Settings"
+                    "history_settings": "Set Past Season Dates"
                 }
             },
             "sensor_settings": {
@@ -42,16 +42,16 @@
                 }
             },
             "history_settings": {
-                "title": "Historical Dates",
-                "description": "Enter historical dates if you want to set them manually.\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days",
+                "title": "Set Past Season Dates",
+                "description": "Enter dates for seasons that have already occurred. These dates will be displayed in the main sensor's attributes (sensor.meteorologisk_arstid).\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days\n\n**Note:** When a new season arrives automatically, the old date will be moved to the history sensor (sensor.meteorologisk_arstid_historisk).",
                 "data": {
-                    "history_spring": "Latest date for Spring",
+                    "history_spring": "Date for Spring",
                     "reset_spring": "Clear date for Spring",
-                    "history_summer": "Latest date for Summer",
+                    "history_summer": "Date for Summer",
                     "reset_summer": "Clear date for Summer",
-                    "history_autumn": "Latest date for Autumn",
+                    "history_autumn": "Date for Autumn",
                     "reset_autumn": "Clear date for Autumn",
-                    "history_winter": "Latest date for Winter",
+                    "history_winter": "Date for Winter",
                     "reset_winter": "Clear date for Winter"
                 }
             }
