@@ -17,7 +17,11 @@ from .const import (
     CONF_HISTORY_SPRING,
     CONF_HISTORY_SUMMER,
     CONF_HISTORY_AUTUMN,
-    CONF_HISTORY_WINTER
+    CONF_HISTORY_WINTER,
+    CONF_SET_CURRENT_SPRING,
+    CONF_SET_CURRENT_SUMMER,
+    CONF_SET_CURRENT_AUTUMN,
+    CONF_SET_CURRENT_WINTER,
 )
 
 CONF_MANUAL_RESET = "MANUAL_RESET"
@@ -96,15 +100,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema({
             vol.Optional(CONF_HISTORY_SPRING): OptionalDateSelector(),
+            vol.Optional(CONF_SET_CURRENT_SPRING, default=False): bool,
             vol.Optional("reset_spring", default=False): bool,
             
             vol.Optional(CONF_HISTORY_SUMMER): OptionalDateSelector(),
+            vol.Optional(CONF_SET_CURRENT_SUMMER, default=False): bool,
             vol.Optional("reset_summer", default=False): bool,
             
             vol.Optional(CONF_HISTORY_AUTUMN): OptionalDateSelector(),
+            vol.Optional(CONF_SET_CURRENT_AUTUMN, default=False): bool,
             vol.Optional("reset_autumn", default=False): bool,
             
             vol.Optional(CONF_HISTORY_WINTER): OptionalDateSelector(),
+            vol.Optional(CONF_SET_CURRENT_WINTER, default=False): bool,
             vol.Optional("reset_winter", default=False): bool,
         })
 
@@ -214,15 +222,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         schema = vol.Schema({
             vol.Optional(CONF_HISTORY_SPRING, default=defaults.get(CONF_HISTORY_SPRING)): OptionalDateSelector(),
+            vol.Optional(CONF_SET_CURRENT_SPRING, default=defaults.get(CONF_SET_CURRENT_SPRING, False)): bool,
             vol.Optional("reset_spring", default=False): bool,
             
             vol.Optional(CONF_HISTORY_SUMMER, default=defaults.get(CONF_HISTORY_SUMMER)): OptionalDateSelector(),
+            vol.Optional(CONF_SET_CURRENT_SUMMER, default=defaults.get(CONF_SET_CURRENT_SUMMER, False)): bool,
             vol.Optional("reset_summer", default=False): bool,
             
             vol.Optional(CONF_HISTORY_AUTUMN, default=defaults.get(CONF_HISTORY_AUTUMN)): OptionalDateSelector(),
+            vol.Optional(CONF_SET_CURRENT_AUTUMN, default=defaults.get(CONF_SET_CURRENT_AUTUMN, False)): bool,
             vol.Optional("reset_autumn", default=False): bool,
             
             vol.Optional(CONF_HISTORY_WINTER, default=defaults.get(CONF_HISTORY_WINTER)): OptionalDateSelector(),
+            vol.Optional(CONF_SET_CURRENT_WINTER, default=defaults.get(CONF_SET_CURRENT_WINTER, False)): bool,
             vol.Optional("reset_winter", default=False): bool,
         })
 

@@ -12,12 +12,16 @@
                 "description": "Step 2: \n\nEnter dates for seasons that have already occurred. These dates will be displayed in the main sensor's attributes (sensor.meteorologisk_arstid).\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days\n\n**Note:** When a new season arrives automatically, the old date will be moved to the history sensor (sensor.meteorologisk_arstid_historisk).",
                 "data": {
                     "history_spring": "Date for Spring",
+                    "set_current_spring": "Set as current season",
                     "reset_spring": "Clear date for Spring",
                     "history_summer": "Date for Summer",
+                    "set_current_summer": "Set as current season",
                     "reset_summer": "Clear date for Summer",
                     "history_autumn": "Date for Autumn",
+                    "set_current_autumn": "Set as current season",
                     "reset_autumn": "Clear date for Autumn",
                     "history_winter": "Date for Winter",
+                    "set_current_winter": "Set as current season",
                     "reset_winter": "Clear date for Winter"
                 }
             }
@@ -46,12 +50,16 @@
                 "description": "Enter dates for seasons that have already occurred. These dates will be displayed in the main sensor's attributes (sensor.meteorologisk_arstid).\n\nFind historical dates here: [SMHI Season Map](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days\n\n**Note:** When a new season arrives automatically, the old date will be moved to the history sensor (sensor.meteorologisk_arstid_historisk).",
                 "data": {
                     "history_spring": "Date for Spring",
+                    "set_current_spring": "Set as current season",
                     "reset_spring": "Clear date for Spring",
                     "history_summer": "Date for Summer",
+                    "set_current_summer": "Set as current season",
                     "reset_summer": "Clear date for Summer",
                     "history_autumn": "Date for Autumn",
+                    "set_current_autumn": "Set as current season",
                     "reset_autumn": "Clear date for Autumn",
                     "history_winter": "Date for Winter",
+                    "set_current_winter": "Set as current season",
                     "reset_winter": "Clear date for Winter"
                 }
             }

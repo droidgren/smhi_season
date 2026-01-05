@@ -19,6 +19,10 @@ from .const import (
     CONF_HISTORY_SUMMER,
     CONF_HISTORY_AUTUMN,
     CONF_HISTORY_WINTER,
+    CONF_SET_CURRENT_SPRING,
+    CONF_SET_CURRENT_SUMMER,
+    CONF_SET_CURRENT_AUTUMN,
+    CONF_SET_CURRENT_WINTER,
     SEASON_WINTER,
     SEASON_SPRING,
     SEASON_SUMMER,
@@ -41,13 +45,20 @@ async def async_setup_entry(
     # Initialize all three sensors
     history_sensor = SmhiHistorySensor(entry.entry_id)
     log_sensor = SmhiLogSensor(entry.entry_id)
-    main_sensor = SmhiSeasonSensor(hass, entry.entry_id, temp_sensor_id, history_sensor, log_sensor)
+    main_sensor = SmhiSeasonSensor(hass, entry, temp_sensor_id, history_sensor, log_sensor)
 
     date_map = {
         SEASON_SPRING: config.get(CONF_HISTORY_SPRING),
         SEASON_SUMMER: config.get(CONF_HISTORY_SUMMER),
         SEASON_AUTUMN: config.get(CONF_HISTORY_AUTUMN),
         SEASON_WINTER: config.get(CONF_HISTORY_WINTER),
+    }
+    
+    set_current_map = {
+        SEASON_SPRING: config.get(CONF_SET_CURRENT_SPRING, False),
+        SEASON_SUMMER: config.get(CONF_SET_CURRENT_SUMMER, False),
+        SEASON_AUTUMN: config.get(CONF_SET_CURRENT_AUTUMN, False),
+        SEASON_WINTER: config.get(CONF_SET_CURRENT_WINTER, False),
     }
 
     # All manually entered dates go to the main sensor, regardless of year
@@ -62,8 +73,11 @@ async def async_setup_entry(
                 d_obj = date.fromisoformat(str(date_str))
                 formatted_date = main_sensor._format_date_swedish(d_obj)
                 
+                # Check if this season should be set as current
+                set_as_current = set_current_map.get(season, False)
+                
                 # All dates go to main sensor
-                main_sensor.set_manual_arrival_date(season, formatted_date)
+                main_sensor.set_manual_arrival_date(season, formatted_date, set_as_current)
                 
             except ValueError:
                 # Log warning to system and logbook (if available)
@@ -145,14 +159,15 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     
     _attr_should_poll = False
 
-    def __init__(self, hass, entry_id, temp_sensor_id, history_sensor, log_sensor):
+    def __init__(self, hass, entry, temp_sensor_id, history_sensor, log_sensor):
         self.hass = hass
+        self._entry = entry
         self._temp_sensor_id = temp_sensor_id
         self._history_sensor = history_sensor
         self._log_sensor = log_sensor
         
         self._attr_name = "Meteorologisk årstid"
-        self._attr_unique_id = f"{entry_id}_main"
+        self._attr_unique_id = f"{entry.entry_id}_main"
         self._attr_icon = "mdi:weather-partly-cloudy"
         
         self.current_season = SEASON_UNKNOWN
@@ -186,6 +201,9 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         # Track which seasons were configured (manually or reset) in this session
         self._configured_seasons = set()
         
+        # Track which season is set as current and when
+        self._current_season_set_date = None
+        
         self.days_needed = {
             SEASON_SPRING: 7,
             SEASON_SUMMER: 5,
@@ -193,12 +211,19 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             SEASON_WINTER: 5,
         }
 
-    def set_manual_arrival_date(self, season, date_str):
+    def set_manual_arrival_date(self, season, date_str, set_as_current=False):
         """Set arrival date manually from config (or clear it)."""
         self.arrival_dates[season] = date_str
         
         if date_str is not None:
             self._manual_flags[season] = True
+            
+            # If this should be set as the current season
+            if set_as_current:
+                self.current_season = season
+                self.season_arrival_date = date_str
+                # Store today's date as when it was set
+                self._current_season_set_date = date.today()
         else:
             self._manual_flags[season] = False
             
@@ -226,7 +251,8 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "Sommarens ankomstdatum": self.arrival_dates[SEASON_SUMMER],
             "Höstens ankomstdatum": self.arrival_dates[SEASON_AUTUMN],
             "Vinterns ankomstdatum": self.arrival_dates[SEASON_WINTER],
-            "manual_flags": self._manual_flags
+            "manual_flags": self._manual_flags,
+            "current_season_set_date": self._current_season_set_date.isoformat() if self._current_season_set_date else None
         }
         return attrs
 
@@ -246,6 +272,14 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 self.current_season = SEASON_UNKNOWN
             
             self.season_arrival_date = state.attributes.get("Ankomstdatum")
+            
+            # Restore current_season_set_date
+            set_date_str = state.attributes.get("current_season_set_date")
+            if set_date_str:
+                try:
+                    self._current_season_set_date = date.fromisoformat(set_date_str)
+                except (ValueError, TypeError):
+                    self._current_season_set_date = None
             
             # Restore counts
             for s in self.consecutive_counts.keys():
@@ -386,6 +420,12 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     # --- Main Logic ---
 
     async def _daily_check(self, now):
+        # Check if we need to unset the "set as current" checkboxes
+        if self._current_season_set_date:
+            if date.today() > self._current_season_set_date:
+                await self._clear_set_current_flags()
+                self._current_season_set_date = None
+        
         yesterday = now - timedelta(days=1)
         start_time = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         end_time = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -434,6 +474,30 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         
         await self._process_smhi_logic(avg_temp, now.date())
         self.async_write_ha_state()
+
+    async def _clear_set_current_flags(self):
+        """Clear all 'set as current season' flags in the config."""
+        new_options = dict(self._entry.options)
+        
+        flags_to_clear = [
+            CONF_SET_CURRENT_SPRING,
+            CONF_SET_CURRENT_SUMMER,
+            CONF_SET_CURRENT_AUTUMN,
+            CONF_SET_CURRENT_WINTER,
+        ]
+        
+        changed = False
+        for flag in flags_to_clear:
+            if new_options.get(flag, False):
+                new_options[flag] = False
+                changed = True
+        
+        if changed:
+            self.hass.config_entries.async_update_entry(
+                self._entry,
+                options=new_options
+            )
+            await self._log_info("Cleared 'set as current season' checkboxes after date passed")
 
     async def _process_smhi_logic(self, avg_temp, today_date):
         data_date = today_date - timedelta(days=1)
