@@ -19,7 +19,6 @@ from .const import (
     CONF_HISTORY_SUMMER,
     CONF_HISTORY_AUTUMN,
     CONF_HISTORY_WINTER,
-    CONF_CURRENT_SEASON,
     SEASON_WINTER,
     SEASON_SPRING,
     SEASON_SUMMER,
@@ -42,8 +41,7 @@ async def async_setup_entry(
     # Initialize all three sensors
     history_sensor = SmhiHistorySensor(entry.entry_id)
     log_sensor = SmhiLogSensor(entry.entry_id)
-    # Pass the full entry object to the main sensor
-    main_sensor = SmhiSeasonSensor(hass, entry, temp_sensor_id, history_sensor, log_sensor)
+    main_sensor = SmhiSeasonSensor(hass, entry.entry_id, temp_sensor_id, history_sensor, log_sensor)
 
     current_year = date.today().year
     
@@ -70,6 +68,7 @@ async def async_setup_entry(
                 else:
                     history_sensor.update_history(season, formatted_date)
             except ValueError:
+                # Log warning to system and logbook (if available)
                 await main_sensor._log_warning("Invalid date format for %s: %s", season, date_str)
                 continue
 
@@ -139,15 +138,14 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     
     _attr_should_poll = False
 
-    def __init__(self, hass, entry, temp_sensor_id, history_sensor, log_sensor):
+    def __init__(self, hass, entry_id, temp_sensor_id, history_sensor, log_sensor):
         self.hass = hass
-        self.entry = entry
         self._temp_sensor_id = temp_sensor_id
         self._history_sensor = history_sensor
         self._log_sensor = log_sensor
         
         self._attr_name = "Meteorologisk årstid"
-        self._attr_unique_id = f"{entry.entry_id}_main"
+        self._attr_unique_id = f"{entry_id}_main"
         self._attr_icon = "mdi:weather-partly-cloudy"
         
         self.current_season = SEASON_UNKNOWN
@@ -178,6 +176,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             SEASON_WINTER: False,
         }
         
+        # Track which seasons were configured (manually or reset) in this session
         self._configured_seasons = set()
         
         self.days_needed = {
@@ -293,10 +292,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     else:
                         self._manual_flags[s] = False
 
-        # Apply Manual Season Override if present in options
-        if manual_season := self.entry.options.get(CONF_CURRENT_SEASON):
-            self.current_season = manual_season
-
         # If frost days is unknown, try to find it in history (background task)
         if self.days_since_frost is None:
             self.hass.async_create_task(self._find_last_frost_date())
@@ -308,6 +303,9 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         from homeassistant.components.recorder import statistics
 
         now = dt_util.now()
+        
+        # Search LONG TERM statistics (up to 180 days)
+        # We skip detailed history as requested.
         long_term_days = 180
         stats_start = now - timedelta(days=long_term_days)
         stats_end = now
@@ -324,6 +322,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         )
         
         if self._temp_sensor_id in stats:
+            # Stats are chronological. Reverse to find latest.
             for stat in reversed(stats[self._temp_sensor_id]):
                 val = stat.get("min")
                 if val is not None and val <= 0:
@@ -334,6 +333,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         stat_dt = ts
                     
                     if stat_dt:
+                        # Ensure timezone awareness
                         if stat_dt.tzinfo is None:
                             stat_dt = stat_dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
 
@@ -345,6 +345,9 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                             self.async_write_ha_state()
                             await self._log_info("Restored 'Dagar sedan frost' from Long Term Statistics: %d days ago (%s)", diff, stat_dt.date())
                         return
+
+
+    # --- Logging Helpers ---
 
     async def _log_info(self, message, *args):
         """Log INFO to system logger and Log entity."""
@@ -358,6 +361,8 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     async def _send_to_logbook(self, message, *args):
         """Format message and send to logbook service if log sensor is available."""
+        # Only check/send if log sensor is fully set up (has hass and entity_id)
+        # This prevents errors during the initial setup phase (async_setup_entry)
         if self._log_sensor and self._log_sensor.hass and self._log_sensor.entity_id:
             try:
                 formatted_message = message % args
@@ -373,6 +378,8 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     "entity_id": self._log_sensor.entity_id,
                 }
             )
+
+    # --- Main Logic ---
 
     async def _daily_check(self, now):
         yesterday = now - timedelta(days=1)
@@ -406,12 +413,14 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 pass
 
         if not temps:
+            # Replaced direct logger call with _log_warning
             await self._log_warning("[%s] No temperature data found for yesterday for %s", yesterday.date(), self._temp_sensor_id)
             return
 
         avg_temp = statistics.mean(temps)
         min_temp = min(temps)
         
+        # Calculate days since frost
         if min_temp <= 0.0:
             self.days_since_frost = 0
         elif self.days_since_frost is not None:
@@ -431,6 +440,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             data_date, avg_temp, self.current_season
         )
         
+        # Criteria Logic
         is_spring_day = avg_temp > 0.0 and \
                         (data_date.month > 2 or (data_date.month == 2 and data_date.day >= 15)) and \
                         (data_date.month < 7 or (data_date.month == 7 and data_date.day <= 31))
@@ -475,6 +485,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             
             if count >= days_needed_for_season:
                 
+                # Check for Green Winter exception: Allow Autumn -> Spring
                 is_green_winter = (self.current_season == SEASON_AUTUMN and season == SEASON_SPRING)
 
                 if season != next_season and not is_green_winter:
@@ -515,15 +526,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     
                     self._manual_flags[season] = False
                     
-                    # --- NEW LOGIC START ---
-                    # Automatically remove the manual override now that the system has naturally found a season.
-                    if self.entry.options.get(CONF_CURRENT_SEASON):
-                        await self._log_info("Automatic transition occurred. Removing manual season override from settings.")
-                        new_opts = dict(self.entry.options)
-                        new_opts.pop(CONF_CURRENT_SEASON, None)
-                        self.hass.config_entries.async_update_entry(self.entry, options=new_opts)
-                    # --- NEW LOGIC END ---
-
                     await self._log_info(
                         "[%s] *** SEASON CHANGE ***: Transitioned to '%s'. Arrival date set to %s.",
                         data_date, season, formatted_date
