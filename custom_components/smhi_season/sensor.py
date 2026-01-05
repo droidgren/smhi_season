@@ -125,12 +125,23 @@ class SmhiHistorySensor(RestoreSensor, SensorEntity):
                     self._state_attributes[k] = v
 
     def update_history(self, season, date_str):
-        """Update a specific historical date."""
-        key = f"{season}s ankomstdatum"
-        if season == SEASON_WINTER:
-            key = "Vinterns ankomstdatum"
-        self._state_attributes[key] = date_str
-        self.async_write_ha_state()
+            """Update a specific historical date."""
+            # Mappa säsongskonstanterna till de korrekta attributnycklarna
+            key_map = {
+                SEASON_SPRING: "Vårens ankomstdatum",
+                SEASON_SUMMER: "Sommarens ankomstdatum",
+                SEASON_AUTUMN: "Höstens ankomstdatum",
+                SEASON_WINTER: "Vinterns ankomstdatum",
+            }
+            
+            key = key_map.get(season)
+            
+            if key:
+                self._state_attributes[key] = date_str
+                
+                # Kontrollera att hass finns innan vi skriver state (fix från förra felet)
+                if self.hass:
+                    self.async_write_ha_state()
 
 
 class SmhiSeasonSensor(RestoreSensor, SensorEntity):
