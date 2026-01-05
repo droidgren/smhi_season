@@ -31,8 +31,7 @@
             "init": {
                 "menu_options": {
                     "sensor_settings": "Sensor Settings",
-                    "history_settings": "Historical Dates Settings",
-                    "season_settings": "Current Season Settings"
+                    "history_settings": "Historical Dates Settings"
                 }
             },
             "sensor_settings": {
@@ -54,13 +53,6 @@
                     "reset_autumn": "Clear date for Autumn",
                     "history_winter": "Latest date for Winter",
                     "reset_winter": "Clear date for Winter"
-                }
-            },
-            "season_settings": {
-                "title": "Current Season Settings",
-                "description": "Manually set the current season. Select 'Automatisk' to remove the override.",
-                "data": {
-                    "current_season": "Current Season"
                 }
             }
         },
