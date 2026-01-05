@@ -7,6 +7,6 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/droidgren/smhi_season/issues",
   "requirements": [],
-  "version": "1.0.20",
+  "version": "1.0.21",
   "context_aware": true
 }
