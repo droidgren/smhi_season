@@ -17,16 +17,10 @@ from .const import (
     CONF_HISTORY_SPRING,
     CONF_HISTORY_SUMMER,
     CONF_HISTORY_AUTUMN,
-    CONF_HISTORY_WINTER,
-    CONF_CURRENT_SEASON,
-    SEASON_SPRING,
-    SEASON_SUMMER,
-    SEASON_AUTUMN,
-    SEASON_WINTER
+    CONF_HISTORY_WINTER
 )
 
 CONF_MANUAL_RESET = "MANUAL_RESET"
-OPTION_AUTO = "Automatisk"
 
 class OptionalDateSelector(selector.DateSelector):
     """Custom DateSelector that accepts empty values (None or empty string)."""
@@ -156,7 +150,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Manage the main options menu."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["sensor_settings", "history_settings", "season_settings"]
+            menu_options=["sensor_settings", "history_settings"]
         )
 
     async def async_step_sensor_settings(
@@ -234,47 +228,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id="history_settings",
-            data_schema=schema,
-            errors=errors
-        )
-
-    async def async_step_season_settings(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle manual season override."""
-        errors = {}
-
-        if user_input is not None:
-            current_options = dict(self.config_entry.options)
-            
-            selected_season = user_input.get(CONF_CURRENT_SEASON)
-            if selected_season == OPTION_AUTO:
-                # Remove override
-                current_options.pop(CONF_CURRENT_SEASON, None)
-            else:
-                current_options[CONF_CURRENT_SEASON] = selected_season
-
-            return self.async_create_entry(title="", data=current_options)
-
-        current_val = self.config_entry.options.get(CONF_CURRENT_SEASON, OPTION_AUTO)
-
-        schema = vol.Schema({
-            vol.Required(CONF_CURRENT_SEASON, default=current_val): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=[
-                        OPTION_AUTO,
-                        SEASON_SPRING,
-                        SEASON_SUMMER,
-                        SEASON_AUTUMN,
-                        SEASON_WINTER
-                    ],
-                    mode=selector.SelectSelectorMode.DROPDOWN
-                )
-            )
-        })
-
-        return self.async_show_form(
-            step_id="season_settings",
             data_schema=schema,
             errors=errors
         )
