@@ -86,7 +86,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input.get("reset_autumn"): user_input[CONF_HISTORY_AUTUMN] = CONF_MANUAL_RESET
             if user_input.get("reset_winter"): user_input[CONF_HISTORY_WINTER] = CONF_MANUAL_RESET
             
-            # Clean up reset keys
+            # Clean up temporary keys (don't save checkboxes to config)
+            set_current_flags = {
+                CONF_SET_CURRENT_SPRING: user_input.pop(CONF_SET_CURRENT_SPRING, False),
+                CONF_SET_CURRENT_SUMMER: user_input.pop(CONF_SET_CURRENT_SUMMER, False),
+                CONF_SET_CURRENT_AUTUMN: user_input.pop(CONF_SET_CURRENT_AUTUMN, False),
+                CONF_SET_CURRENT_WINTER: user_input.pop(CONF_SET_CURRENT_WINTER, False),
+            }
+            
             for key in ["reset_spring", "reset_summer", "reset_autumn", "reset_winter"]:
                 user_input.pop(key, None)
 
@@ -94,6 +101,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             if self._validate_dates(user_input, errors):
                 final_data = {**self._config_data, **user_input}
+                # Add set_current flags temporarily for sensor setup
+                final_data.update(set_current_flags)
                 return self.async_create_entry(
                     title="Meteorologisk Årstid", data=final_data
                 )
@@ -202,6 +211,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             if user_input.get("reset_autumn"): user_input[CONF_HISTORY_AUTUMN] = CONF_MANUAL_RESET
             if user_input.get("reset_winter"): user_input[CONF_HISTORY_WINTER] = CONF_MANUAL_RESET
             
+            # Extract set_current flags before cleaning up
+            set_current_flags = {
+                CONF_SET_CURRENT_SPRING: user_input.pop(CONF_SET_CURRENT_SPRING, False),
+                CONF_SET_CURRENT_SUMMER: user_input.pop(CONF_SET_CURRENT_SUMMER, False),
+                CONF_SET_CURRENT_AUTUMN: user_input.pop(CONF_SET_CURRENT_AUTUMN, False),
+                CONF_SET_CURRENT_WINTER: user_input.pop(CONF_SET_CURRENT_WINTER, False),
+            }
+            
             for key in ["reset_spring", "reset_summer", "reset_autumn", "reset_winter"]:
                 user_input.pop(key, None)
 
@@ -210,6 +227,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             if self._validate_dates(user_input, errors):
                 current_options = dict(self.config_entry.options)
                 current_options.update(user_input)
+                # Add set_current flags temporarily for sensor setup
+                current_options.update(set_current_flags)
                 
                 return self.async_create_entry(title="", data=current_options)
 
@@ -222,19 +241,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         schema = vol.Schema({
             vol.Optional(CONF_HISTORY_SPRING, default=defaults.get(CONF_HISTORY_SPRING)): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_SPRING, default=defaults.get(CONF_SET_CURRENT_SPRING, False)): bool,
+            vol.Optional(CONF_SET_CURRENT_SPRING, default=False): bool,
             vol.Optional("reset_spring", default=False): bool,
             
             vol.Optional(CONF_HISTORY_SUMMER, default=defaults.get(CONF_HISTORY_SUMMER)): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_SUMMER, default=defaults.get(CONF_SET_CURRENT_SUMMER, False)): bool,
+            vol.Optional(CONF_SET_CURRENT_SUMMER, default=False): bool,
             vol.Optional("reset_summer", default=False): bool,
             
             vol.Optional(CONF_HISTORY_AUTUMN, default=defaults.get(CONF_HISTORY_AUTUMN)): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_AUTUMN, default=defaults.get(CONF_SET_CURRENT_AUTUMN, False)): bool,
+            vol.Optional(CONF_SET_CURRENT_AUTUMN, default=False): bool,
             vol.Optional("reset_autumn", default=False): bool,
             
             vol.Optional(CONF_HISTORY_WINTER, default=defaults.get(CONF_HISTORY_WINTER)): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_WINTER, default=defaults.get(CONF_SET_CURRENT_WINTER, False)): bool,
+            vol.Optional(CONF_SET_CURRENT_WINTER, default=False): bool,
             vol.Optional("reset_winter", default=False): bool,
         })
 
