@@ -2,27 +2,55 @@
     "config": {
         "step": {
             "user": {
+                "title": "Meteorologisk Årstid",
                 "description": "Steg 1: Välj sensor.",
                 "data": {
                     "temperature_sensor": "Temperatursensor (Utomhus)"
                 }
             },
-            "history": {
+            "menu": {
+                "title": "Inställningar",
+                "menu_options": {
+                    "history_settings": "Ange datum för förflutna årstider (Valfritt)",
+                    "finish": "Avsluta installationen"
+                }
+            },
+            "history_settings": {
                 "title": "Ange datum för förflutna årstider (Valfritt)",
-                "description": "Steg 2: \n\nAnge datum för årstider som redan inträffat. Dessa datum kommer att visas i huvudsensorns attribut (sensor.meteorologisk_arstid).\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitioner:**\n* **Vår:** > 0°C i 7 dagar (tidigast 15 feb)\n* **Sommar:** ≥ 10°C i 5 dagar\n* **Höst:** < 10°C i 5 dagar (tidigast 1 aug)\n* **Vinter:** ≤ 0°C i 5 dagar\n\n**OBS:** När en ny årstid inträffar automatiskt kommer det gamla datumet att flyttas till historiksensorn (sensor.meteorologisk_arstid_historisk).",
-                "data": {
-                    "history_spring": "Datum för Vår",
-                    "set_current_spring": "Ange som nuvarande årstid",
-                    "reset_spring": "Rensa datum för Vår",
-                    "history_summer": "Datum för Sommar",
-                    "set_current_summer": "Ange som nuvarande årstid",
-                    "reset_summer": "Rensa datum för Sommar",
-                    "history_autumn": "Datum för Höst",
-                    "set_current_autumn": "Ange som nuvarande årstid",
-                    "reset_autumn": "Rensa datum för Höst",
-                    "history_winter": "Datum för Vinter",
-                    "set_current_winter": "Ange som nuvarande årstid",
-                    "reset_winter": "Rensa datum för Vinter"
+                "description": "Ange datum för årstider som redan inträffat. Dessa datum kommer att visas i huvudsensorns attribut (sensor.meteorologisk_arstid).\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitioner:**\n* **Vår:** > 0°C i 7 dagar (tidigast 15 feb)\n* **Sommar:** ≥ 10°C i 5 dagar\n* **Höst:** < 10°C i 5 dagar (tidigast 1 aug)\n* **Vinter:** ≤ 0°C i 5 dagar\n\n**OBS:** När en ny årstid inträffar automatiskt kommer det gamla datumet att flyttas till historiksensorn (sensor.meteorologisk_arstid_historisk).",
+                "sections": {
+                    "section_spring": {
+                        "name": "Vår",
+                        "data": {
+                            "history_spring": "Datum",
+                            "set_current_spring": "Ange som nuvarande årstid",
+                            "reset_spring": "Rensa datum för Vår"
+                        }
+                    },
+                    "section_summer": {
+                        "name": "Sommar",
+                        "data": {
+                            "history_summer": "Datum",
+                            "set_current_summer": "Ange som nuvarande årstid",
+                            "reset_summer": "Rensa datum för Sommar"
+                        }
+                    },
+                    "section_autumn": {
+                        "name": "Höst",
+                        "data": {
+                            "history_autumn": "Datum",
+                            "set_current_autumn": "Ange som nuvarande årstid",
+                            "reset_autumn": "Rensa datum för Höst"
+                        }
+                    },
+                    "section_winter": {
+                        "name": "Vinter",
+                        "data": {
+                            "history_winter": "Datum",
+                            "set_current_winter": "Ange som nuvarande årstid",
+                            "reset_winter": "Rensa datum för Vinter"
+                        }
+                    }
                 }
             }
         },
@@ -33,34 +61,55 @@
     "options": {
         "step": {
             "init": {
+                "title": "Meteorologisk Årstid",
+                "description": "Vad vill du konfigurera?",
                 "menu_options": {
                     "sensor_settings": "Inställningar för sensor",
-                    "history_settings": "Ange datum för förflutna årstider"
+                    "history_settings": "Ange datum för förflutna årstider (Valfritt)"
                 }
             },
             "sensor_settings": {
-                "title": "Sensorinställningar",
-                "description": "Välj temperatursensor.",
+                "title": "Inställningar för sensor",
                 "data": {
                     "temperature_sensor": "Temperatursensor (Utomhus)"
                 }
             },
             "history_settings": {
-                "title": "Ange datum för förflutna årstider",
+                "title": "Ange datum för förflutna årstider (Valfritt)",
                 "description": "Ange datum för årstider som redan inträffat. Dessa datum kommer att visas i huvudsensorns attribut (sensor.meteorologisk_arstid).\n\nHitta historiska datum här: [SMHI Årstidskarta](https://www.smhi.se/vader/observationer/arstidskarta)\n\n**Definitioner:**\n* **Vår:** > 0°C i 7 dagar (tidigast 15 feb)\n* **Sommar:** ≥ 10°C i 5 dagar\n* **Höst:** < 10°C i 5 dagar (tidigast 1 aug)\n* **Vinter:** ≤ 0°C i 5 dagar\n\n**OBS:** När en ny årstid inträffar automatiskt kommer det gamla datumet att flyttas till historiksensorn (sensor.meteorologisk_arstid_historisk).",
-                "data": {
-                    "history_spring": "Datum för Vår",
-                    "set_current_spring": "Ange som nuvarande årstid",
-                    "reset_spring": "Rensa datum för Vår",
-                    "history_summer": "Datum för Sommar",
-                    "set_current_summer": "Ange som nuvarande årstid",
-                    "reset_summer": "Rensa datum för Sommar",
-                    "history_autumn": "Datum för Höst",
-                    "set_current_autumn": "Ange som nuvarande årstid",
-                    "reset_autumn": "Rensa datum för Höst",
-                    "history_winter": "Datum för Vinter",
-                    "set_current_winter": "Ange som nuvarande årstid",
-                    "reset_winter": "Rensa datum för Vinter"
+                "sections": {
+                    "section_spring": {
+                        "name": "Vår",
+                        "data": {
+                            "history_spring": "Datum",
+                            "set_current_spring": "Ange som nuvarande årstid",
+                            "reset_spring": "Rensa datum för Vår"
+                        }
+                    },
+                    "section_summer": {
+                        "name": "Sommar",
+                        "data": {
+                            "history_summer": "Datum",
+                            "set_current_summer": "Ange som nuvarande årstid",
+                            "reset_summer": "Rensa datum för Sommar"
+                        }
+                    },
+                    "section_autumn": {
+                        "name": "Höst",
+                        "data": {
+                            "history_autumn": "Datum",
+                            "set_current_autumn": "Ange som nuvarande årstid",
+                            "reset_autumn": "Rensa datum för Höst"
+                        }
+                    },
+                    "section_winter": {
+                        "name": "Vinter",
+                        "data": {
+                            "history_winter": "Datum",
+                            "set_current_winter": "Ange som nuvarande årstid",
+                            "reset_winter": "Rensa datum för Vinter"
+                        }
+                    }
                 }
             }
         },

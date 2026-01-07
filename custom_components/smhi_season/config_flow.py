@@ -8,7 +8,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.data_entry_flow import FlowResult, section
 from homeassistant.helpers import selector
 
 from .const import (
@@ -27,7 +27,7 @@ from .const import (
 CONF_MANUAL_RESET = "MANUAL_RESET"
 
 class OptionalDateSelector(selector.DateSelector):
-    """Custom DateSelector that accepts empty values (None or empty string)."""
+    """Custom DateSelector that accepts empty values."""
     def __call__(self, value):
         if value is None or value == "" or str(value) == "None":
             return None
@@ -41,15 +41,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
     
-    def __init__(self):
-        """Initialize the config flow."""
-        self._config_data = {}
-
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return OptionsFlowHandler(config_entry)
+        return OptionsFlowHandler()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -58,13 +54,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            self._config_data.update(user_input)
-            return await self.async_step_history()
+            self._config_data = user_input
+            # Go to menu to ask about history
+            return await self.async_step_menu()
 
         schema = vol.Schema({
             vol.Required(CONF_TEMPERATURE_SENSOR): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-            )
+            ),
         })
 
         return self.async_show_form(
@@ -73,20 +70,35 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_history(
+    async def async_step_menu(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the second step (History Dates)."""
+        """Show menu to choose between configuring history or finishing."""
+        return self.async_show_menu(
+            step_id="menu",
+            menu_options=["history_settings", "finish"]
+        )
+
+    async def async_step_history_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle the history settings step."""
         errors = {}
 
         if user_input is not None:
-            # Handle Resets
+            flat_input = {}
+            for key, value in user_input.items():
+                if isinstance(value, dict):
+                    flat_input.update(value)
+                else:
+                    flat_input[key] = value
+            user_input = flat_input
+
             if user_input.get("reset_spring"): user_input[CONF_HISTORY_SPRING] = CONF_MANUAL_RESET
             if user_input.get("reset_summer"): user_input[CONF_HISTORY_SUMMER] = CONF_MANUAL_RESET
             if user_input.get("reset_autumn"): user_input[CONF_HISTORY_AUTUMN] = CONF_MANUAL_RESET
             if user_input.get("reset_winter"): user_input[CONF_HISTORY_WINTER] = CONF_MANUAL_RESET
             
-            # Clean up temporary keys (don't save checkboxes to config)
             set_current_flags = {
                 CONF_SET_CURRENT_SPRING: user_input.pop(CONF_SET_CURRENT_SPRING, False),
                 CONF_SET_CURRENT_SUMMER: user_input.pop(CONF_SET_CURRENT_SUMMER, False),
@@ -101,35 +113,62 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             if self._validate_dates(user_input, errors):
                 final_data = {**self._config_data, **user_input}
-                # Add set_current flags temporarily for sensor setup
                 final_data.update(set_current_flags)
                 return self.async_create_entry(
                     title="Meteorologisk Årstid", data=final_data
                 )
 
-        schema = vol.Schema({
-            vol.Optional(CONF_HISTORY_SPRING): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_SPRING, default=False): bool,
-            vol.Optional("reset_spring", default=False): bool,
-            
-            vol.Optional(CONF_HISTORY_SUMMER): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_SUMMER, default=False): bool,
-            vol.Optional("reset_summer", default=False): bool,
-            
-            vol.Optional(CONF_HISTORY_AUTUMN): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_AUTUMN, default=False): bool,
-            vol.Optional("reset_autumn", default=False): bool,
-            
-            vol.Optional(CONF_HISTORY_WINTER): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_WINTER, default=False): bool,
-            vol.Optional("reset_winter", default=False): bool,
-        })
-
+        schema = self._get_history_schema()
         return self.async_show_form(
-            step_id="history",
+            step_id="history_settings",
             data_schema=schema,
             errors=errors,
         )
+    
+    async def async_step_finish(self, user_input=None):
+        """Finish the flow without history."""
+        return self.async_create_entry(
+            title="Meteorologisk Årstid", data=self._config_data
+        )
+
+    def _get_history_schema(self, defaults=None):
+        if defaults is None:
+            defaults = {}
+        
+        return vol.Schema({
+            vol.Optional("section_spring"): section(
+                vol.Schema({
+                    vol.Optional(CONF_HISTORY_SPRING, default=defaults.get(CONF_HISTORY_SPRING)): OptionalDateSelector(),
+                    vol.Optional(CONF_SET_CURRENT_SPRING, default=False): bool,
+                    vol.Optional("reset_spring", default=False): bool,
+                }),
+                {"collapsed": True}
+            ),
+            vol.Optional("section_summer"): section(
+                vol.Schema({
+                    vol.Optional(CONF_HISTORY_SUMMER, default=defaults.get(CONF_HISTORY_SUMMER)): OptionalDateSelector(),
+                    vol.Optional(CONF_SET_CURRENT_SUMMER, default=False): bool,
+                    vol.Optional("reset_summer", default=False): bool,
+                }),
+                {"collapsed": True}
+            ),
+            vol.Optional("section_autumn"): section(
+                vol.Schema({
+                    vol.Optional(CONF_HISTORY_AUTUMN, default=defaults.get(CONF_HISTORY_AUTUMN)): OptionalDateSelector(),
+                    vol.Optional(CONF_SET_CURRENT_AUTUMN, default=False): bool,
+                    vol.Optional("reset_autumn", default=False): bool,
+                }),
+                {"collapsed": True}
+            ),
+            vol.Optional("section_winter"): section(
+                vol.Schema({
+                    vol.Optional(CONF_HISTORY_WINTER, default=defaults.get(CONF_HISTORY_WINTER)): OptionalDateSelector(),
+                    vol.Optional(CONF_SET_CURRENT_WINTER, default=False): bool,
+                    vol.Optional("reset_winter", default=False): bool,
+                }),
+                {"collapsed": True}
+            ),
+        })
 
     def _normalize_dates(self, user_input):
         date_keys = [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]
@@ -157,14 +196,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for SMHI Season."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self._config_entry = config_entry
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage the main options menu."""
+        """Show the Main Menu."""
         return self.async_show_menu(
             step_id="init",
             menu_options=["sensor_settings", "history_settings"]
@@ -173,22 +208,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_sensor_settings(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage the temperature sensor selection."""
+        """Manage Sensor Settings."""
         errors = {}
-        
         if user_input is not None:
-            # Update options
-            current_options = dict(self.config_entry.options)
-            current_options[CONF_TEMPERATURE_SENSOR] = user_input[CONF_TEMPERATURE_SENSOR]
-            return self.async_create_entry(title="", data=current_options)
+            self.config_entry.options = {**self.config_entry.options, **user_input}
+            return self.async_create_entry(title="", data=self.config_entry.options)
 
-        current_sensor = self.config_entry.options.get(
-            CONF_TEMPERATURE_SENSOR, 
-            self.config_entry.data.get(CONF_TEMPERATURE_SENSOR)
-        )
-
+        defaults = {**self.config_entry.data, **self.config_entry.options}
         schema = vol.Schema({
-            vol.Required(CONF_TEMPERATURE_SENSOR, default=current_sensor): selector.EntitySelector(
+            vol.Required(CONF_TEMPERATURE_SENSOR, default=defaults.get(CONF_TEMPERATURE_SENSOR)): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
         })
@@ -202,16 +230,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_history_settings(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle history settings sub-dialog."""
+        """Manage History Settings with Sections."""
         errors = {}
         
         if user_input is not None:
+            flat_input = {}
+            for key, value in user_input.items():
+                if isinstance(value, dict):
+                    flat_input.update(value)
+                else:
+                    flat_input[key] = value
+            user_input = flat_input
+
             if user_input.get("reset_spring"): user_input[CONF_HISTORY_SPRING] = CONF_MANUAL_RESET
             if user_input.get("reset_summer"): user_input[CONF_HISTORY_SUMMER] = CONF_MANUAL_RESET
             if user_input.get("reset_autumn"): user_input[CONF_HISTORY_AUTUMN] = CONF_MANUAL_RESET
             if user_input.get("reset_winter"): user_input[CONF_HISTORY_WINTER] = CONF_MANUAL_RESET
             
-            # Extract set_current flags before cleaning up
             set_current_flags = {
                 CONF_SET_CURRENT_SPRING: user_input.pop(CONF_SET_CURRENT_SPRING, False),
                 CONF_SET_CURRENT_SUMMER: user_input.pop(CONF_SET_CURRENT_SUMMER, False),
@@ -227,34 +262,49 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             if self._validate_dates(user_input, errors):
                 current_options = dict(self.config_entry.options)
                 current_options.update(user_input)
-                # Add set_current flags temporarily for sensor setup
                 current_options.update(set_current_flags)
-                
                 return self.async_create_entry(title="", data=current_options)
 
         defaults = {**self.config_entry.data, **self.config_entry.options}
         
-        # Hide manual reset sentinels from UI
         for key in [CONF_HISTORY_SPRING, CONF_HISTORY_SUMMER, CONF_HISTORY_AUTUMN, CONF_HISTORY_WINTER]:
             if defaults.get(key) == CONF_MANUAL_RESET:
                 defaults[key] = None
 
+        # Re-use schema with sections
         schema = vol.Schema({
-            vol.Optional(CONF_HISTORY_SPRING, default=defaults.get(CONF_HISTORY_SPRING)): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_SPRING, default=False): bool,
-            vol.Optional("reset_spring", default=False): bool,
-            
-            vol.Optional(CONF_HISTORY_SUMMER, default=defaults.get(CONF_HISTORY_SUMMER)): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_SUMMER, default=False): bool,
-            vol.Optional("reset_summer", default=False): bool,
-            
-            vol.Optional(CONF_HISTORY_AUTUMN, default=defaults.get(CONF_HISTORY_AUTUMN)): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_AUTUMN, default=False): bool,
-            vol.Optional("reset_autumn", default=False): bool,
-            
-            vol.Optional(CONF_HISTORY_WINTER, default=defaults.get(CONF_HISTORY_WINTER)): OptionalDateSelector(),
-            vol.Optional(CONF_SET_CURRENT_WINTER, default=False): bool,
-            vol.Optional("reset_winter", default=False): bool,
+            vol.Optional("section_spring"): section(
+                vol.Schema({
+                    vol.Optional(CONF_HISTORY_SPRING, default=defaults.get(CONF_HISTORY_SPRING)): OptionalDateSelector(),
+                    vol.Optional(CONF_SET_CURRENT_SPRING, default=False): bool,
+                    vol.Optional("reset_spring", default=False): bool,
+                }),
+                {"collapsed": True}
+            ),
+            vol.Optional("section_summer"): section(
+                vol.Schema({
+                    vol.Optional(CONF_HISTORY_SUMMER, default=defaults.get(CONF_HISTORY_SUMMER)): OptionalDateSelector(),
+                    vol.Optional(CONF_SET_CURRENT_SUMMER, default=False): bool,
+                    vol.Optional("reset_summer", default=False): bool,
+                }),
+                {"collapsed": True}
+            ),
+            vol.Optional("section_autumn"): section(
+                vol.Schema({
+                    vol.Optional(CONF_HISTORY_AUTUMN, default=defaults.get(CONF_HISTORY_AUTUMN)): OptionalDateSelector(),
+                    vol.Optional(CONF_SET_CURRENT_AUTUMN, default=False): bool,
+                    vol.Optional("reset_autumn", default=False): bool,
+                }),
+                {"collapsed": True}
+            ),
+            vol.Optional("section_winter"): section(
+                vol.Schema({
+                    vol.Optional(CONF_HISTORY_WINTER, default=defaults.get(CONF_HISTORY_WINTER)): OptionalDateSelector(),
+                    vol.Optional(CONF_SET_CURRENT_WINTER, default=False): bool,
+                    vol.Optional("reset_winter", default=False): bool,
+                }),
+                {"collapsed": True}
+            ),
         })
 
         return self.async_show_form(
