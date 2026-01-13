@@ -4,17 +4,16 @@ on:
   push:
   pull_request:
   schedule:
-    - cron: "0 0 * * *_" # Körs varje natt vid midnatt
-  workflow_dispatch: # Gör det möjligt att starta manuellt
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions: {}
 
 jobs:
   validate-hacs:
     runs-on: "ubuntu-latest"
     steps:
-      - name: Checkout code
-        uses: "actions/checkout@v4"
-
       - name: HACS validation
         uses: "hacs/action@main"
         with:
-          category: "integration"
+          category: "CHANGE_ME!"
