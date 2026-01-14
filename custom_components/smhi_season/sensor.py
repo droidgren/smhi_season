@@ -276,6 +276,17 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 
                 self.season_arrival_date = state.attributes.get("Ankomstdatum")
             
+            # Restore sensor specific attributes 
+            self.last_update = state.attributes.get("Senast uppdaterad")
+
+            avg_temp_str = state.attributes.get("Förra dygnets medeltemp")
+            if avg_temp_str:
+                try:
+                    self.daily_avg_temp = float(avg_temp_str.replace("°C", ""))
+                except ValueError:
+                    self.daily_avg_temp = None
+           
+            
             # Restore counts
             for s in self.consecutive_counts.keys():
                 val = state.attributes.get(f"{s}dygn")
