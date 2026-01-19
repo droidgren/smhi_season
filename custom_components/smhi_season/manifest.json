@@ -3,12 +3,12 @@
   "name": "Meteorologisk årstid",
   "codeowners": [],
   "config_flow": true,
+  "dependencies": [
+    "recorder"
+  ],
   "documentation": "https://github.com/droidgren/smhi_season",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/droidgren/smhi_season/issues",
   "requirements": [],
-  "version": "1.0.26",
-  "dependencies": [
-    "recorder"
-  ]
+  "version": "1.0.26"
 }
