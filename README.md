@@ -10,6 +10,7 @@ A custom integration that calculates the meteorological season based on SMHI (Sw
   - **Vår:** > 0.0°C (7 days, earliest Feb 15)
   - **Sommar:** ≥ 10.0°C (5 days)
   - **Höst:** < 10.0°C (5 days, earliest Aug 1)
+  - All temperatures are daily averages
 - **Sensor 1:** `sensor.meteorologisk_arstid` (Shows current season, progress count, and arrival dates for current cycle).
 - **Sensor 2:** `sensor.meteorologisk_arstid_historisk` (Shows arrival dates for the previous cycle).
 - **Sensor 3:** `sensor.meteorologisk_arstid_logg` (Show last update)
