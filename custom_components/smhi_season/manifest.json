@@ -8,5 +8,7 @@
   "issue_tracker": "https://github.com/droidgren/smhi_season/issues",
   "requirements": [],
   "version": "1.0.26",
-  "context_aware": true
+  "dependencies": [
+    "recorder"
+  ]
 }
