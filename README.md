@@ -5,7 +5,7 @@ A custom integration that calculates the meteorological season based on SMHI (Sw
 ## Features
 - Calculates daily average temperature automatically.
 - Tracks consecutive days to determine season changes.
-- Follows strict SMHI date and temperature rules:
+- Follows strict [SMHI date and temperature rules](https://www.smhi.se/vader/observationer/arstidskarta):
   - **Vinter:** ≤ 0.0°C (5 days)
   - **Vår:** > 0.0°C (7 days, earliest Feb 15)
   - **Sommar:** ≥ 10.0°C (5 days)
