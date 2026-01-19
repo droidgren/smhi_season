@@ -19,10 +19,11 @@ A custom integration that calculates the meteorological season based on SMHI (Sw
 
 ### HACS (Recommended)
 1. Ensure [HACS](https://hacs.xyz/) is installed.
-2. Go to HACS -> Integrations -> 3 dots (top right) -> Custom repositories.
-3. Add the URL to this repository. Category: **Integration**.
-4. Click "Download".
-5. Restart Home Assistant.
+2. Go to **HACS** -> **Integrations**.
+3. Click **+ Explore & Download Repositories**.
+4. Search for "Meteorologisk årstid".
+5. Click **Download**.
+6. Restart Home Assistant.
 
 ### Manual
 1. Copy the `custom_components/smhi_season` folder to your HA `custom_components` directory.
