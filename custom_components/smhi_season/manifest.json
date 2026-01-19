@@ -1,7 +1,7 @@
 {
   "domain": "smhi_season",
   "name": "Meteorologisk årstid",
-  "codeowners": [],
+  "codeowners": ["@droidgren"],
   "config_flow": true,
   "dependencies": [
     "recorder"
