@@ -47,5 +47,8 @@ The main sensor provides:
 - **Höstdygn 0/5:** Progress towards Autumn.
 - **Förra dygnets medeltemp:** The calculated average used for the logic.
 
+## Screenhots
+![Sensor](./custom_components/screenshot1.png)
+
 ## Disclaimer
 This project is an independent custom integration and is **not** affiliated with, endorsed by, or connected to **SMHI** (Swedish Meteorological and Hydrological Institute) in any way. It simply uses their public meteorological definitions to calculate seasons.
