@@ -1,5 +1,3 @@
-[![hacs][hacs-default]][hacs-default-link] [![hacs][hacs-validate]][hacs-validate-link]
-
 # ![icon](./custom_components/icon_128.png) Meteorologisk Årstid for Home Assistant
 
 A custom integration that calculates the meteorological season based on SMHI (Swedish Meteorological and Hydrological Institute) definitions.
