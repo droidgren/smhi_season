@@ -3,6 +3,7 @@
 # ![icon](./custom_components/icon_128.png) Meteorologisk Årstid for Home Assistant
 
 A custom integration that calculates the meteorological season based on SMHI (Swedish Meteorological and Hydrological Institute) definitions.
+![bruck](./custom_components/brick-card.png)
 
 ## Features
 - Calculates daily average temperature automatically.
@@ -16,6 +17,7 @@ A custom integration that calculates the meteorological season based on SMHI (Sw
 - **Sensor 1:** `sensor.meteorologisk_arstid` (Shows current season, progress count, and arrival dates for current cycle).
 - **Sensor 2:** `sensor.meteorologisk_arstid_historisk` (Shows arrival dates for the previous cycle).
 - **Sensor 3:** `sensor.meteorologisk_arstid_logg` (Show last update)
+- Available in Swedish and English Language.
 
 ## Installation
 
