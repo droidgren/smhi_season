@@ -356,6 +356,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     async def _find_last_frost_date(self):
         """Check Long Term Statistics for the last frost date."""
+        from homeassistant.components.recorder import get_instance
         from homeassistant.components.recorder import statistics
 
         now = dt_util.now()
@@ -365,7 +366,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         stats_start = now - timedelta(days=long_term_days)
         stats_end = now
 
-        stats = await self.hass.async_add_executor_job(
+        stats = await get_instance(self.hass).async_add_executor_job(
             statistics.statistics_during_period,
             self.hass,
             stats_start,
@@ -439,9 +440,10 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         start_time = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         end_time = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
 
+        from homeassistant.components.recorder import get_instance
         from homeassistant.components.recorder import history
         
-        events = await self.hass.async_add_executor_job(
+        events = await get_instance(self.hass).async_add_executor_job(
             history.state_changes_during_period,
             self.hass,
             start_time,
