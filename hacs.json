@@ -2,5 +2,6 @@
   "name": "Meteorologisk årstid",
   "render_readme": true,
   "country": ["SE"],
-  "homeassistant": "2024.1.0"
+  "homeassistant": "2024.1.0",
+  "content_in_root": false
 }
