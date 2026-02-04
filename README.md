@@ -1,12 +1,12 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 ![Validate](https://github.com/droidgren/smhi_season/actions/workflows/validate.yaml/badge.svg)
 
-![icon](./custom_components/icon_128.png) 
+![icon](./custom_components/smhi_season/imgs/icon_128.png) 
 #  Meteorologisk Årstid for Home Assistant
 
 A custom integration that calculates the meteorological season based on SMHI (Swedish Meteorological and Hydrological Institute) definitions.
 
-![bruck](./custom_components/brick-card.png)
+![bruck](./custom_components/smhi_season/imgs/brick-card.png)
 
 ## Features
 - Calculates daily average temperature automatically.
@@ -53,7 +53,7 @@ The main sensor provides:
 - **Förra dygnets medeltemp:** The calculated average used for the logic.
 
 ## Screenhots
-![Sensor](./custom_components/screenshot1.png)
+![Sensor](./custom_components/smhi_season/imgs/screenshot1.png)
 
 ## Disclaimer
 This project is an independent custom integration and is **not** affiliated with, endorsed by, or connected to **SMHI** (Swedish Meteorological and Hydrological Institute) in any way. It simply uses their public meteorological definitions to calculate seasons.
