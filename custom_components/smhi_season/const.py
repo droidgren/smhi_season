@@ -21,3 +21,11 @@ SEASON_SPRING = "Vår"
 SEASON_SUMMER = "Sommar"
 SEASON_AUTUMN = "Höst"
 SEASON_UNKNOWN = "Okänd"
+
+SEASON_ICONS = {
+    SEASON_WINTER: "mdi:snowflake",
+    SEASON_SPRING: "mdi:flower",
+    SEASON_SUMMER: "mdi:weather-sunny",
+    SEASON_AUTUMN: "mdi:leaf",
+    SEASON_UNKNOWN: "mdi:weather-partly-cloudy",
+}
