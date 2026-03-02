@@ -28,6 +28,7 @@ from .const import (
     SEASON_SUMMER,
     SEASON_AUTUMN,
     SEASON_UNKNOWN,
+    SEASON_ICONS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -168,7 +169,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         
         self._attr_name = "Meteorologisk årstid"
         self._attr_unique_id = f"{entry.entry_id}_main"
-        self._attr_icon = "mdi:weather-partly-cloudy"
         
         self.current_season = SEASON_UNKNOWN
         self.season_arrival_date = None
@@ -232,6 +232,10 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
     @property
     def native_value(self):
         return self.current_season
+
+    @property
+    def icon(self):
+        return SEASON_ICONS.get(self.current_season, SEASON_ICONS[SEASON_UNKNOWN])
 
     @property
     def extra_state_attributes(self):
