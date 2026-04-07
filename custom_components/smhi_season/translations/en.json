@@ -20,7 +20,7 @@
             },
             "history_settings": {
                 "title": "Set Past Season Dates (Optional)",
-                "description": "Enter dates for seasons that have already occurred. These dates will be displayed in the main sensor's attributes (sensor.meteorologisk_arstid).\n\nCheck the link to SMHI in README for how to get previous season dates.\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days\n\n**Note:** When a new season arrives automatically, the old date will be moved to the history sensor (sensor.meteorologisk_arstid_historisk).",
+                "description": "Enter dates for seasons that have already occurred. These dates will be displayed in the main sensor's attributes (sensor.meteorologisk_arstid).\n\nCheck the link to SMHI in README for how to get previous season dates.\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days\n\n**Note:** When a new season arrives automatically, the old date will be moved to the history sensor (sensor.meteorologisk_arstid_historisk). \"Set as current season\" is a one-time override and is cleared automatically after it has been applied.",
                 "sections": {
                     "section_spring": {
                         "name": "Spring",
@@ -82,7 +82,7 @@
             },
             "history_settings": {
                 "title": "Set Past Season Dates (Optional)",
-                "description": "Enter dates for seasons that have already occurred. These dates will be displayed in the main sensor's attributes (sensor.meteorologisk_arstid).\n\nCheck the link to SMHI in README for previous season dates.\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days\n\n**Note:** When a new season arrives automatically, the old date will be moved to the history sensor (sensor.meteorologisk_arstid_historisk).",
+                "description": "Enter dates for seasons that have already occurred. These dates will be displayed in the main sensor's attributes (sensor.meteorologisk_arstid).\n\nCheck the link to SMHI in README for previous season dates.\n\n**Definitions:**\n* **Spring:** > 0°C for 7 consecutive days (earliest Feb 15)\n* **Summer:** ≥ 10°C for 5 consecutive days\n* **Autumn:** < 10°C for 5 consecutive days (earliest Aug 1)\n* **Winter:** ≤ 0°C for 5 consecutive days\n\n**Note:** When a new season arrives automatically, the old date will be moved to the history sensor (sensor.meteorologisk_arstid_historisk). \"Set as current season\" is a one-time override and is cleared automatically after it has been applied.",
                 "sections": {
                     "section_spring": {
                         "name": "Spring",
