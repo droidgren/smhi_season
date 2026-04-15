@@ -299,7 +299,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         if self.current_season == SEASON_SPRING: return SEASON_SUMMER
         if self.current_season == SEASON_SUMMER: return SEASON_AUTUMN
         if self.current_season == SEASON_AUTUMN: return SEASON_WINTER
-        return SEASON_WINTER
+        return None
 
     def _sync_current_season_from_arrival_dates(self):
         """Use the most recent known arrival date to correct stale current-season state."""
@@ -616,7 +616,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 # Check for Green Winter exception: Allow Autumn -> Spring
                 is_green_winter = (self.current_season == SEASON_AUTUMN and season == SEASON_SPRING)
 
-                if season != next_season and not is_green_winter:
+                if next_season is not None and season != next_season and not is_green_winter:
                     await self._log_info(
                         "[%s] Criteria met for '%s' (%d/%d), but logical next season is '%s'. Transition blocked.",
                         data_date, season, count, days_needed_for_season, next_season
