@@ -52,6 +52,11 @@ The main sensor provides:
 - **Höstdygn 0/5:** Progress towards Autumn.
 - **Förra dygnets medeltemp:** The calculated average used for the logic.
 
+> **Note:** After a season is confirmed (e.g., Spring at 7/7), the counter continues to
+> increment as long as the criteria are met (8/7, 9/7, …). This shows the total number
+> of consecutive days that qualify for the current season. The counter resets to 0 only
+> when a day no longer meets the season's criteria.
+
 ## Screenhots
 ![Sensor](./custom_components/smhi_season/imgs/screenshot1.png)
 

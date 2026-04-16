@@ -612,7 +612,11 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             days_needed_for_season = self.days_needed[season]
             
             if count >= days_needed_for_season:
-                
+
+                # Already in this season — just let the counter keep climbing
+                if season == self.current_season:
+                    continue
+
                 # Check for Green Winter exception: Allow Autumn -> Spring
                 is_green_winter = (self.current_season == SEASON_AUTUMN and season == SEASON_SPRING)
 
@@ -668,10 +672,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         "[%s] *** SEASON CHANGE ***: Transitioned to '%s'. Arrival date set to %s.",
                         data_date, season, formatted_date
                     )
-                    
-                    self.consecutive_counts[season] = 0
-                else:
-                    self.consecutive_counts[season] = 0
 
         await self._log_info(
             "[%s] Daily check finished. Current Season: %s, Next Target: %s, Transition Counters: %s",
