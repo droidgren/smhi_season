@@ -608,24 +608,21 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         self.consecutive_counts = new_counts
         next_season = self.target_season()
 
-        for season, count in self.consecutive_counts.items():
+        # Build the candidate list: only evaluate the logical next season and the
+        # Green Winter exception (Autumn → Spring directly, bypassing Winter).
+        # Iterating all seasons would cause repeated "Transition blocked" log entries
+        # every day for any season whose counter keeps climbing past its threshold.
+        transition_candidates = []
+        if next_season is not None:
+            transition_candidates.append(next_season)
+        if self.current_season == SEASON_AUTUMN and SEASON_SPRING not in transition_candidates:
+            transition_candidates.append(SEASON_SPRING)
+
+        for season in transition_candidates:
+            count = self.consecutive_counts.get(season, 0)
             days_needed_for_season = self.days_needed[season]
-            
+
             if count >= days_needed_for_season:
-
-                # Already in this season — just let the counter keep climbing
-                if season == self.current_season:
-                    continue
-
-                # Check for Green Winter exception: Allow Autumn -> Spring
-                is_green_winter = (self.current_season == SEASON_AUTUMN and season == SEASON_SPRING)
-
-                if next_season is not None and season != next_season and not is_green_winter:
-                    await self._log_info(
-                        "[%s] Criteria met for '%s' (%d/%d), but logical next season is '%s'. Transition blocked.",
-                        data_date, season, count, days_needed_for_season, next_season
-                    )
-                    continue 
                 
                 arrival_dt = data_date - timedelta(days=days_needed_for_season - 1)
                 
