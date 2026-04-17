@@ -33,6 +33,36 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+SET_CURRENT_KEYS = (
+    CONF_SET_CURRENT_SPRING,
+    CONF_SET_CURRENT_SUMMER,
+    CONF_SET_CURRENT_AUTUMN,
+    CONF_SET_CURRENT_WINTER,
+)
+
+
+def _clear_set_current_overrides(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Clear one-shot current season overrides after they have been applied."""
+    updated_data = dict(entry.data)
+    updated_options = dict(entry.options)
+    changed = False
+
+    for key in SET_CURRENT_KEYS:
+        if updated_data.get(key):
+            updated_data[key] = False
+            changed = True
+
+        if updated_options.get(key):
+            updated_options[key] = False
+            changed = True
+
+    if changed:
+        hass.config_entries.async_update_entry(
+            entry,
+            data=updated_data,
+            options=updated_options,
+        )
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -61,6 +91,7 @@ async def async_setup_entry(
         SEASON_AUTUMN: config.get(CONF_SET_CURRENT_AUTUMN, False),
         SEASON_WINTER: config.get(CONF_SET_CURRENT_WINTER, False),
     }
+    consumed_current_override = False
 
     # All manually entered dates go to the main sensor, regardless of year
     for season, date_str in date_map.items():
@@ -79,11 +110,15 @@ async def async_setup_entry(
                 
                 # All dates go to main sensor
                 main_sensor.set_manual_arrival_date(season, formatted_date, set_as_current)
+                consumed_current_override = consumed_current_override or set_as_current
                 
             except ValueError:
                 # Log warning to system and logbook (if available)
                 await main_sensor._log_warning("Invalid date format for %s: %s", season, date_str)
                 continue
+
+    if consumed_current_override:
+        _clear_set_current_overrides(hass, entry)
 
     async_add_entities([main_sensor, history_sensor, log_sensor])
 
@@ -264,7 +299,35 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         if self.current_season == SEASON_SPRING: return SEASON_SUMMER
         if self.current_season == SEASON_SUMMER: return SEASON_AUTUMN
         if self.current_season == SEASON_AUTUMN: return SEASON_WINTER
-        return SEASON_WINTER
+        return None
+
+    def _sync_current_season_from_arrival_dates(self):
+        """Use the most recent known arrival date to correct stale current-season state."""
+        latest_season = None
+        latest_arrival = None
+
+        for season, date_str in self.arrival_dates.items():
+            if not date_str:
+                continue
+
+            parsed_date = self._parse_date_swedish(date_str, date.today().year)
+            if parsed_date is None:
+                continue
+
+            if latest_arrival is None or parsed_date > latest_arrival:
+                latest_arrival = parsed_date
+                latest_season = season
+
+        if latest_season is None:
+            return False
+
+        latest_date_str = self.arrival_dates[latest_season]
+        if self.current_season == latest_season and self.season_arrival_date == latest_date_str:
+            return False
+
+        self.current_season = latest_season
+        self.season_arrival_date = latest_date_str
+        return True
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
@@ -349,6 +412,13 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             self.async_write_ha_state()
             await self._log_info(
                 "Manually set current season to '%s' with arrival date %s",
+                self.current_season, self.season_arrival_date
+            )
+
+        if self._sync_current_season_from_arrival_dates():
+            self.async_write_ha_state()
+            await self._log_info(
+                "Reconciled current season to '%s' from latest known arrival date %s.",
                 self.current_season, self.season_arrival_date
             )
 
@@ -542,11 +612,15 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             days_needed_for_season = self.days_needed[season]
             
             if count >= days_needed_for_season:
-                
+
+                # Already in this season — just let the counter keep climbing
+                if season == self.current_season:
+                    continue
+
                 # Check for Green Winter exception: Allow Autumn -> Spring
                 is_green_winter = (self.current_season == SEASON_AUTUMN and season == SEASON_SPRING)
 
-                if season != next_season and not is_green_winter:
+                if next_season is not None and season != next_season and not is_green_winter:
                     await self._log_info(
                         "[%s] Criteria met for '%s' (%d/%d), but logical next season is '%s'. Transition blocked.",
                         data_date, season, count, days_needed_for_season, next_season
@@ -564,10 +638,19 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         diff = arrival_dt - existing_dt
                         if diff.days < 180 and diff.days > -180:
                             should_update = False
-                            await self._log_info(
-                                "[%s] *** Season change SKIPPED ***: Criteria met for '%s', but date is already set recently (%s).",
-                                data_date, season, existing_date_str
-                            )
+                            if self.current_season != season or self.season_arrival_date != existing_date_str:
+                                previous_season = self.current_season
+                                self.current_season = season
+                                self.season_arrival_date = existing_date_str
+                                await self._log_info(
+                                    "[%s] Reconciled current season from '%s' to '%s' using existing arrival date %s.",
+                                    data_date, previous_season, season, existing_date_str
+                                )
+                            else:
+                                await self._log_info(
+                                    "[%s] *** Season change SKIPPED ***: Criteria met for '%s', but date is already set recently (%s).",
+                                    data_date, season, existing_date_str
+                                )
                         else:
                             await self._log_info(
                                 "[%s] Existing date for '%s' (%s) is old. Moving to history and updating.",
@@ -589,10 +672,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         "[%s] *** SEASON CHANGE ***: Transitioned to '%s'. Arrival date set to %s.",
                         data_date, season, formatted_date
                     )
-                    
-                    self.consecutive_counts[season] = 0
-                else:
-                    self.consecutive_counts[season] = 0
 
         await self._log_info(
             "[%s] Daily check finished. Current Season: %s, Next Target: %s, Transition Counters: %s",
