@@ -238,6 +238,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         
         # Track if we need to write state after being added to hass
         self._pending_state_write = False
+        self._pending_current_override = None
         
         self.days_needed = {
             SEASON_SPRING: 7,
@@ -259,6 +260,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 self.season_arrival_date = date_str
                 # Mark that we need to write state once entity is added to hass
                 self._pending_state_write = True
+                self._pending_current_override = (season, date_str)
         else:
             self._manual_flags[season] = False
             
@@ -301,8 +303,8 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         if self.current_season == SEASON_AUTUMN: return SEASON_WINTER
         return None
 
-    def _sync_current_season_from_arrival_dates(self):
-        """Use the most recent known arrival date to correct stale current-season state."""
+    def _reconcile_state_from_arrival_dates(self):
+        """Align current season with the latest arrival date and clear stale manual flags."""
         latest_season = None
         latest_arrival = None
 
@@ -319,15 +321,25 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                 latest_season = season
 
         if latest_season is None:
-            return False
+            return False, False
 
         latest_date_str = self.arrival_dates[latest_season]
-        if self.current_season == latest_season and self.season_arrival_date == latest_date_str:
-            return False
+        current_changed = False
+        flags_changed = False
 
-        self.current_season = latest_season
-        self.season_arrival_date = latest_date_str
-        return True
+        if self.current_season != latest_season or self.season_arrival_date != latest_date_str:
+            self.current_season = latest_season
+            self.season_arrival_date = latest_date_str
+            current_changed = True
+
+        for season, is_manual in self._manual_flags.items():
+            if season == latest_season or not is_manual:
+                continue
+
+            self._manual_flags[season] = False
+            flags_changed = True
+
+        return current_changed, flags_changed
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
@@ -372,51 +384,43 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     self.days_since_frost = None
 
             # Restore Manual Flags
-            saved_flags = state.attributes.get("manual_flags", {})
-            has_history = len(saved_flags) > 0 
-            
-            if saved_flags:
+            saved_flags = state.attributes.get("manual_flags")
+            if isinstance(saved_flags, dict):
                 for s in self._manual_flags:
                     if s not in self._configured_seasons and s in saved_flags:
-                        self._manual_flags[s] = saved_flags[s]
+                        self._manual_flags[s] = bool(saved_flags[s])
 
             # Restore Dates Logic
+            key_map = {
+                SEASON_SPRING: "Vårens ankomstdatum",
+                SEASON_SUMMER: "Sommarens ankomstdatum",
+                SEASON_AUTUMN: "Höstens ankomstdatum",
+                SEASON_WINTER: "Vinterns ankomstdatum",
+            }
+
             for s in self.arrival_dates.keys():
-                if s in self._configured_seasons:
+                if s in self._configured_seasons or self.arrival_dates[s] is not None:
                     continue
 
-                if self.arrival_dates[s] is None:
-                    was_manual = self._manual_flags.get(s, False)
-                    should_restore = True
-                    if was_manual:
-                         should_restore = False
-                    elif not has_history:
-                         should_restore = False 
-                    
-                    if should_restore:
-                        key_map = {
-                            SEASON_SPRING: "Vårens ankomstdatum",
-                            SEASON_SUMMER: "Sommarens ankomstdatum",
-                            SEASON_AUTUMN: "Höstens ankomstdatum",
-                            SEASON_WINTER: "Vinterns ankomstdatum",
-                        }
-                        key = key_map.get(s)
-                        if key:
-                            self.arrival_dates[s] = state.attributes.get(key)
-                    else:
-                        self._manual_flags[s] = False
+                key = key_map.get(s)
+                if key:
+                    self.arrival_dates[s] = state.attributes.get(key)
+
+        current_changed, flags_changed = self._reconcile_state_from_arrival_dates()
+        pending_override = self._pending_current_override
 
         # If we have a pending state write (from "set as current" checkbox), write it now
-        if self._pending_state_write:
+        if self._pending_state_write or current_changed or flags_changed:
             self._pending_state_write = False
+            self._pending_current_override = None
             self.async_write_ha_state()
+
+        if pending_override is not None and self.current_season == pending_override[0] and self.season_arrival_date == pending_override[1]:
             await self._log_info(
                 "Manually set current season to '%s' with arrival date %s",
-                self.current_season, self.season_arrival_date
+                pending_override[0], pending_override[1]
             )
-
-        if self._sync_current_season_from_arrival_dates():
-            self.async_write_ha_state()
+        elif current_changed:
             await self._log_info(
                 "Reconciled current season to '%s' from latest known arrival date %s.",
                 self.current_season, self.season_arrival_date
@@ -672,6 +676,13 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         "[%s] *** SEASON CHANGE ***: Transitioned to '%s'. Arrival date set to %s.",
                         data_date, season, formatted_date
                     )
+
+        current_changed, _ = self._reconcile_state_from_arrival_dates()
+        if current_changed:
+            await self._log_info(
+                "[%s] Reconciled current season to '%s' from latest known arrival date %s.",
+                data_date, self.current_season, self.season_arrival_date
+            )
 
         await self._log_info(
             "[%s] Daily check finished. Current Season: %s, Next Target: %s, Transition Counters: %s",
