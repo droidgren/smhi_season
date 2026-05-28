@@ -78,6 +78,9 @@ async def async_setup_entry(
     log_sensor = SmhiLogSensor(entry.entry_id)
     main_sensor = SmhiSeasonSensor(hass, entry, temp_sensor_id, history_sensor, log_sensor)
 
+    hass.data[DOMAIN][entry.entry_id]["main_sensor"] = main_sensor
+
+
     date_map = {
         SEASON_SPRING: config.get(CONF_HISTORY_SPRING),
         SEASON_SUMMER: config.get(CONF_HISTORY_SUMMER),
@@ -509,7 +512,28 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     # --- Main Logic ---
 
+    async def process_debug_step(self, debug_date, debug_temp):
+        """Process a simulated day instead of reading recorder data."""
+        self.daily_avg_temp = float(debug_temp)
+        min_temp = self.daily_avg_temp # Assume same as average for testing
+        
+        if min_temp <= 0.0:
+            self.days_since_frost = 0
+        elif self.days_since_frost is not None:
+            self.days_since_frost += 1
+
+        self.last_update = debug_date.isoformat()
+        
+        # 'now' internally acts as tomorrow when evaluating 'yesterday'
+        # so we pass debug_date as yesterday's date
+        await self._process_smhi_logic(self.daily_avg_temp, debug_date + timedelta(days=1))
+        self.async_write_ha_state()
+
     async def _daily_check(self, now):
+        shared_data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id, {})
+        if shared_data.get("debug_step") and shared_data.get("debug_date") and shared_data.get("debug_temp"):
+            return # Skip normal logic
+
         yesterday = now - timedelta(days=1)
         start_time = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         end_time = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
