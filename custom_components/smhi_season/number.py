@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.const import UnitOfTemperature, EntityCategory
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_ENABLE_DEBUG_ENTITIES
 
 
 async def async_setup_entry(
@@ -15,6 +15,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the debug temperature entity."""
+    enable_debug = entry.options.get(CONF_ENABLE_DEBUG_ENTITIES, entry.data.get(CONF_ENABLE_DEBUG_ENTITIES, False))
+    if not enable_debug:
+        return
+
     number_entity = SmhiDebugTemp(entry)
 
     if entry.entry_id in hass.data.get(DOMAIN, {}):
