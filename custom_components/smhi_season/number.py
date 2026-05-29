@@ -29,7 +29,7 @@ class SmhiDebugTemp(NumberEntity):
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_entity_registry_enabled_default = False
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_native_min_value = -50.0
     _attr_native_max_value = 50.0
     _attr_native_step = 0.1
