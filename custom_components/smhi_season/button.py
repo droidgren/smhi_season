@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from homeassistant.const import EntityCategory
 
 
 async def async_setup_entry(
@@ -30,6 +31,7 @@ class SmhiDebugStep(ButtonEntity):
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_entity_registry_enabled_default = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the button."""
