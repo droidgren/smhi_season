@@ -78,6 +78,9 @@ async def async_setup_entry(
     log_sensor = SmhiLogSensor(entry.entry_id)
     main_sensor = SmhiSeasonSensor(hass, entry, temp_sensor_id, history_sensor, log_sensor)
 
+    hass.data[DOMAIN][entry.entry_id]["main_sensor"] = main_sensor
+
+
     date_map = {
         SEASON_SPRING: config.get(CONF_HISTORY_SPRING),
         SEASON_SUMMER: config.get(CONF_HISTORY_SUMMER),
@@ -138,7 +141,8 @@ class SmhiLogSensor(SensorEntity):
     def update_timestamp(self):
         """Update the state to show when the last log happened."""
         self._attr_native_value = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.async_write_ha_state()
+        if self.hass is not None:
+            self.async_write_ha_state()
 
 
 class SmhiHistorySensor(RestoreSensor, SensorEntity):
@@ -277,6 +281,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         def get_count(season, limit):
             return f"{self.consecutive_counts.get(season, 0)}/{limit}"
 
+        config = {**self._entry.data, **self._entry.options}
         attrs = {
             "Ankomstdatum": self.season_arrival_date,
             "Förra dygnets medeltemp": f"{self.daily_avg_temp:.1f}°C" if self.daily_avg_temp is not None else None,
@@ -290,8 +295,23 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "Sommarens ankomstdatum": self.arrival_dates[SEASON_SUMMER],
             "Höstens ankomstdatum": self.arrival_dates[SEASON_AUTUMN],
             "Vinterns ankomstdatum": self.arrival_dates[SEASON_WINTER],
+            "config_history_spring": config.get(CONF_HISTORY_SPRING),
+            "config_history_summer": config.get(CONF_HISTORY_SUMMER),
+            "config_history_autumn": config.get(CONF_HISTORY_AUTUMN),
+            "config_history_winter": config.get(CONF_HISTORY_WINTER),
+            "config_set_spring": config.get(CONF_SET_CURRENT_SPRING, False),
+            "config_set_summer": config.get(CONF_SET_CURRENT_SUMMER, False),
+            "config_set_autumn": config.get(CONF_SET_CURRENT_AUTUMN, False),
+            "config_set_winter": config.get(CONF_SET_CURRENT_WINTER, False),
             "manual_flags": self._manual_flags
         }
+        
+        # Hide internal config variables inside a single attribute
+        internal_config = {}
+        for key in ["config_history_spring", "config_history_summer", "config_history_autumn", "config_history_winter", 
+                    "config_set_spring", "config_set_summer", "config_set_autumn", "config_set_winter", "manual_flags"]:
+            internal_config[key] = attrs.pop(key)
+        attrs["_internal_config_state"] = internal_config
         return attrs
 
     def target_season(self):
@@ -334,6 +354,26 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         
         # First, restore from saved state if available
         if (state := await self.async_get_last_state()) is not None:
+            # Check for stale "set_as_current" configurations on reboot
+            internal_config = state.attributes.get("_internal_config_state", {})
+            config = {**self._entry.data, **self._entry.options}
+            stale_set_map = {
+                SEASON_SPRING: ("config_set_spring", CONF_SET_CURRENT_SPRING),
+                SEASON_SUMMER: ("config_set_summer", CONF_SET_CURRENT_SUMMER),
+                SEASON_AUTUMN: ("config_set_autumn", CONF_SET_CURRENT_AUTUMN),
+                SEASON_WINTER: ("config_set_winter", CONF_SET_CURRENT_WINTER),
+            }
+            is_stale_set = False
+            for season_key, (attr_key, conf_key) in stale_set_map.items():
+                if config.get(conf_key, False):
+                    # Check in new internal_config first, fallback to root attributes
+                    last_val = internal_config.get(attr_key, state.attributes.get(attr_key))
+                    if last_val == True:
+                        is_stale_set = True
+            
+            if is_stale_set and self._pending_state_write:
+                self._pending_state_write = False
+                
             # Only restore if we don't have pending changes from config
             if not self._pending_state_write:
                 self.current_season = state.state
@@ -372,13 +412,34 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     self.days_since_frost = None
 
             # Restore Manual Flags
-            saved_flags = state.attributes.get("manual_flags", {})
+            saved_flags = internal_config.get("manual_flags", state.attributes.get("manual_flags", {}))
             has_history = len(saved_flags) > 0 
             
             if saved_flags:
                 for s in self._manual_flags:
                     if s not in self._configured_seasons and s in saved_flags:
                         self._manual_flags[s] = saved_flags[s]
+
+            # Check for stale configurations (reboot vs fresh option change)
+            stale_keys_map = {
+                SEASON_SPRING: ("Vårens ankomstdatum", "config_history_spring", CONF_HISTORY_SPRING),
+                SEASON_SUMMER: ("Sommarens ankomstdatum", "config_history_summer", CONF_HISTORY_SUMMER),
+                SEASON_AUTUMN: ("Höstens ankomstdatum", "config_history_autumn", CONF_HISTORY_AUTUMN),
+                SEASON_WINTER: ("Vinterns ankomstdatum", "config_history_winter", CONF_HISTORY_WINTER),
+            }
+            for s in list(self._configured_seasons):
+                if s in stale_keys_map:
+                    attr_name, config_attr_name, conf_key = stale_keys_map[s]
+                    last_config_val = internal_config.get(config_attr_name, state.attributes.get(config_attr_name))
+                    current_config_val = config.get(conf_key)
+                    
+                    if last_config_val is not None and last_config_val == current_config_val:
+                        # The config hasn't changed since the state was saved!
+                        # Treat this as a reboot: restore dynamic arrival date from state.
+                        saved_date = state.attributes.get(attr_name)
+                        if saved_date is not None:
+                             self.arrival_dates[s] = saved_date
+                        self._configured_seasons.discard(s)
 
             # Restore Dates Logic
             for s in self.arrival_dates.keys():
@@ -407,15 +468,17 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         self._manual_flags[s] = False
 
         # If we have a pending state write (from "set as current" checkbox), write it now
+        pending_write_done = False
         if self._pending_state_write:
             self._pending_state_write = False
+            pending_write_done = True
             self.async_write_ha_state()
             await self._log_info(
                 "Manually set current season to '%s' with arrival date %s",
                 self.current_season, self.season_arrival_date
             )
 
-        if self._sync_current_season_from_arrival_dates():
+        if not pending_write_done and self._sync_current_season_from_arrival_dates():
             self.async_write_ha_state()
             await self._log_info(
                 "Reconciled current season to '%s' from latest known arrival date %s.",
@@ -491,25 +554,56 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     async def _send_to_logbook(self, message, *args):
         """Format message and send to logbook service if log sensor is available."""
-        if self._log_sensor and self._log_sensor.hass and self._log_sensor.entity_id:
+        if self._log_sensor:
             try:
                 formatted_message = message % args
             except Exception:
                 formatted_message = message
             
             self._log_sensor.update_timestamp()
-            await self.hass.services.async_call(
-                "logbook", "log",
-                {
-                    "name": self._log_sensor.name,
-                    "message": formatted_message,
-                    "entity_id": self._log_sensor.entity_id,
-                }
-            )
+            
+            entity_id = self._log_sensor.entity_id
+            name = self._log_sensor.name
+            
+            # Fallback if log sensor is not yet fully initialized by HA
+            if not entity_id:
+                entity_id = self.entity_id
+                name = self.name
+                
+            if self.hass and entity_id:
+                await self.hass.services.async_call(
+                    "logbook", "log",
+                    {
+                        "name": name,
+                        "message": formatted_message,
+                        "entity_id": entity_id,
+                    }
+                )
 
     # --- Main Logic ---
 
+    async def process_debug_step(self, debug_date, debug_temp):
+        """Process a simulated day instead of reading recorder data."""
+        self.daily_avg_temp = float(debug_temp)
+        min_temp = self.daily_avg_temp # Assume same as average for testing
+        
+        if min_temp <= 0.0:
+            self.days_since_frost = 0
+        elif self.days_since_frost is not None:
+            self.days_since_frost += 1
+
+        self.last_update = debug_date.isoformat()
+        
+        # 'now' internally acts as tomorrow when evaluating 'yesterday'
+        # so we pass debug_date as yesterday's date
+        await self._process_smhi_logic(self.daily_avg_temp, debug_date + timedelta(days=1))
+        self.async_write_ha_state()
+
     async def _daily_check(self, now):
+        shared_data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id, {})
+        if shared_data.get("debug_step") and shared_data.get("debug_date") and shared_data.get("debug_temp"):
+            return # Skip normal logic
+
         yesterday = now - timedelta(days=1)
         start_time = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         end_time = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)

@@ -5,10 +5,12 @@
                 "title": "Meteorological Season",
                 "description": "Step 1: Select sensor.",
                 "data": {
-                    "temperature_sensor": "Temperature Sensor (Outdoor)"
+                    "temperature_sensor": "Temperature Sensor (Outdoor)",
+                    "enable_debug_entities": "Enable debug entities"
                 },
                 "data_description": {
-                    "temperature_sensor": "Select the outdoor temperature sensor to use for season calculations."
+                    "temperature_sensor": "Select the outdoor temperature sensor to use for season calculations.",
+                    "enable_debug_entities": "Enable debug entities for date and temperature testing."
                 }
             },
             "menu": {
@@ -74,10 +76,12 @@
             "sensor_settings": {
                 "title": "Sensor Settings",
                 "data": {
-                    "temperature_sensor": "Temperature Sensor (Outdoor)"
+                    "temperature_sensor": "Temperature Sensor (Outdoor)",
+                    "enable_debug_entities": "Enable debug entities"
                 },
                 "data_description": {
-                    "temperature_sensor": "Select the outdoor temperature sensor to use for season calculations."
+                    "temperature_sensor": "Select the outdoor temperature sensor to use for season calculations.",
+                    "enable_debug_entities": "Enable hidden debug entities for date and temperature testing."
                 }
             },
             "history_settings": {

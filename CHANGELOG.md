@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.36
+
+- **Added:** Debug entities (Date, Temp, and Step Day button) for simulating days and temperatures. This helps with testing algorithm logic without waiting for real-time days.
+- **Fixed:** Resolves issue #11 (https://github.com/droidgren/smhi_season/issues/11).
+
 ## 1.0.35
 
 - **Changed:** Season day counters no longer reset to 0 after a season transition is confirmed. The counter continues to increment (e.g., 8/7, 9/7) as long as the season criteria are met, showing the total number of consecutive qualifying days. The counter resets only when a day no longer meets the criteria.

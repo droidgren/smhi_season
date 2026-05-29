@@ -5,10 +5,12 @@
                 "title": "Meteorologisk Årstid",
                 "description": "Steg 1: Välj sensor.",
                 "data": {
-                    "temperature_sensor": "Temperatursensor (Utomhus)"
+                    "temperature_sensor": "Temperatursensor (Utomhus)",
+                    "enable_debug_entities": "Aktivera debugg-entiteter"
                 },
                 "data_description": {
-                    "temperature_sensor": "Välj utomhustemperatursensorn som ska användas för årstidsberäkningar."
+                    "temperature_sensor": "Välj utomhustemperatursensorn som ska användas för årstidsberäkningar.",
+                    "enable_debug_entities": "Aktivera debugg-entiteter för datum- och temperaturtestning."
                 }
             },
             "menu": {
@@ -74,10 +76,12 @@
             "sensor_settings": {
                 "title": "Inställningar för sensor",
                 "data": {
-                    "temperature_sensor": "Temperatursensor (Utomhus)"
+                    "temperature_sensor": "Temperatursensor (Utomhus)",
+                    "enable_debug_entities": "Aktivera debug-entiteter"
                 },
                 "data_description": {
-                    "temperature_sensor": "Välj utomhustemperatursensorn som ska användas för årstidsberäkningar."
+                    "temperature_sensor": "Välj utomhustemperatursensorn som ska användas för årstidsberäkningar.",
+                    "enable_debug_entities": "Aktivera dolda debug-entiteter för datum- och temperaturtestning."
                 }
             },
             "history_settings": {

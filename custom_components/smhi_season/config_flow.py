@@ -14,6 +14,7 @@ from homeassistant.helpers import selector
 from .const import (
     DOMAIN, 
     CONF_TEMPERATURE_SENSOR,
+    CONF_ENABLE_DEBUG_ENTITIES,
     CONF_HISTORY_SPRING,
     CONF_HISTORY_SUMMER,
     CONF_HISTORY_AUTUMN,
@@ -62,6 +63,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_TEMPERATURE_SENSOR): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
+            vol.Optional(CONF_ENABLE_DEBUG_ENTITIES, default=False): bool,
         })
 
         return self.async_show_form(
@@ -219,6 +221,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             vol.Required(CONF_TEMPERATURE_SENSOR, default=defaults.get(CONF_TEMPERATURE_SENSOR)): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
+            vol.Optional(CONF_ENABLE_DEBUG_ENTITIES, default=defaults.get(CONF_ENABLE_DEBUG_ENTITIES, False)): bool,
         })
 
         return self.async_show_form(
