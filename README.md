@@ -60,5 +60,20 @@ The main sensor provides:
 ## Screenhots
 ![Sensor](./custom_components/smhi_season/imgs/screenshot1.png)
 
+## Debug Entities
+For testing and simulation, you can enable Debug Entities through the integration's configuration choices (Options). When enabled, three new entities are provided:
+1. **Debug Date**: Lets you manually set a mock date.
+2. **Debug Temp**: Lets you manually set the daily average temperature for simulation.
+3. **Debug Step Day (Button)**: Pressing this button will process the mock date and temperature as if the day has just ended.
+
+This makes it easy to simulate consecutive days of specific temperatures and quickly verify season transitions.
+
+## Changelog
+*See the full history in CHANGELOG.md.*
+
+### 1.36
+- **Added:** Debug entities for simulating days and temperatures to test season transitions manually.
+- **Fixed:** Resolves issue #11.
+
 ## Disclaimer
 This project is an independent custom integration and is **not** affiliated with, endorsed by, or connected to **SMHI** (Swedish Meteorological and Hydrological Institute) in any way. It simply uses their public meteorological definitions to calculate seasons.
