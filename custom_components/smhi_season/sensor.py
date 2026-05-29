@@ -304,6 +304,13 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "config_set_winter": config.get(CONF_SET_CURRENT_WINTER, False),
             "manual_flags": self._manual_flags
         }
+        
+        # Hide internal config variables inside a single attribute
+        internal_config = {}
+        for key in ["config_history_spring", "config_history_summer", "config_history_autumn", "config_history_winter", 
+                    "config_set_spring", "config_set_summer", "config_set_autumn", "config_set_winter", "manual_flags"]:
+            internal_config[key] = attrs.pop(key)
+        attrs["_internal_config_state"] = internal_config
         return attrs
 
     def target_season(self):
@@ -347,6 +354,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         # First, restore from saved state if available
         if (state := await self.async_get_last_state()) is not None:
             # Check for stale "set_as_current" configurations on reboot
+            internal_config = state.attributes.get("_internal_config_state", {})
             config = {**self._entry.data, **self._entry.options}
             stale_set_map = {
                 SEASON_SPRING: ("config_set_spring", CONF_SET_CURRENT_SPRING),
@@ -357,7 +365,9 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             is_stale_set = False
             for season_key, (attr_key, conf_key) in stale_set_map.items():
                 if config.get(conf_key, False):
-                    if state.attributes.get(attr_key) == True:
+                    # Check in new internal_config first, fallback to root attributes
+                    last_val = internal_config.get(attr_key, state.attributes.get(attr_key))
+                    if last_val == True:
                         is_stale_set = True
             
             if is_stale_set and self._pending_state_write:
@@ -401,7 +411,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     self.days_since_frost = None
 
             # Restore Manual Flags
-            saved_flags = state.attributes.get("manual_flags", {})
+            saved_flags = internal_config.get("manual_flags", state.attributes.get("manual_flags", {}))
             has_history = len(saved_flags) > 0 
             
             if saved_flags:
@@ -410,7 +420,6 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         self._manual_flags[s] = saved_flags[s]
 
             # Check for stale configurations (reboot vs fresh option change)
-            config = {**self._entry.data, **self._entry.options}
             stale_keys_map = {
                 SEASON_SPRING: ("Vårens ankomstdatum", "config_history_spring", CONF_HISTORY_SPRING),
                 SEASON_SUMMER: ("Sommarens ankomstdatum", "config_history_summer", CONF_HISTORY_SUMMER),
@@ -420,7 +429,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             for s in list(self._configured_seasons):
                 if s in stale_keys_map:
                     attr_name, config_attr_name, conf_key = stale_keys_map[s]
-                    last_config_val = state.attributes.get(config_attr_name)
+                    last_config_val = internal_config.get(config_attr_name, state.attributes.get(config_attr_name))
                     current_config_val = config.get(conf_key)
                     
                     if last_config_val is not None and last_config_val == current_config_val:
