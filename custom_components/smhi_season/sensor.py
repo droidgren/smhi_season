@@ -280,6 +280,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         def get_count(season, limit):
             return f"{self.consecutive_counts.get(season, 0)}/{limit}"
 
+        config = {**self._entry.data, **self._entry.options}
         attrs = {
             "Ankomstdatum": self.season_arrival_date,
             "Förra dygnets medeltemp": f"{self.daily_avg_temp:.1f}°C" if self.daily_avg_temp is not None else None,
@@ -293,6 +294,14 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             "Sommarens ankomstdatum": self.arrival_dates[SEASON_SUMMER],
             "Höstens ankomstdatum": self.arrival_dates[SEASON_AUTUMN],
             "Vinterns ankomstdatum": self.arrival_dates[SEASON_WINTER],
+            "config_history_spring": config.get(CONF_HISTORY_SPRING),
+            "config_history_summer": config.get(CONF_HISTORY_SUMMER),
+            "config_history_autumn": config.get(CONF_HISTORY_AUTUMN),
+            "config_history_winter": config.get(CONF_HISTORY_WINTER),
+            "config_set_spring": config.get(CONF_SET_CURRENT_SPRING, False),
+            "config_set_summer": config.get(CONF_SET_CURRENT_SUMMER, False),
+            "config_set_autumn": config.get(CONF_SET_CURRENT_AUTUMN, False),
+            "config_set_winter": config.get(CONF_SET_CURRENT_WINTER, False),
             "manual_flags": self._manual_flags
         }
         return attrs
@@ -337,6 +346,23 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
         
         # First, restore from saved state if available
         if (state := await self.async_get_last_state()) is not None:
+            # Check for stale "set_as_current" configurations on reboot
+            config = {**self._entry.data, **self._entry.options}
+            stale_set_map = {
+                SEASON_SPRING: ("config_set_spring", CONF_SET_CURRENT_SPRING),
+                SEASON_SUMMER: ("config_set_summer", CONF_SET_CURRENT_SUMMER),
+                SEASON_AUTUMN: ("config_set_autumn", CONF_SET_CURRENT_AUTUMN),
+                SEASON_WINTER: ("config_set_winter", CONF_SET_CURRENT_WINTER),
+            }
+            is_stale_set = False
+            for season_key, (attr_key, conf_key) in stale_set_map.items():
+                if config.get(conf_key, False):
+                    if state.attributes.get(attr_key) == True:
+                        is_stale_set = True
+            
+            if is_stale_set and self._pending_state_write:
+                self._pending_state_write = False
+                
             # Only restore if we don't have pending changes from config
             if not self._pending_state_write:
                 self.current_season = state.state
@@ -383,6 +409,28 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                     if s not in self._configured_seasons and s in saved_flags:
                         self._manual_flags[s] = saved_flags[s]
 
+            # Check for stale configurations (reboot vs fresh option change)
+            config = {**self._entry.data, **self._entry.options}
+            stale_keys_map = {
+                SEASON_SPRING: ("Vårens ankomstdatum", "config_history_spring", CONF_HISTORY_SPRING),
+                SEASON_SUMMER: ("Sommarens ankomstdatum", "config_history_summer", CONF_HISTORY_SUMMER),
+                SEASON_AUTUMN: ("Höstens ankomstdatum", "config_history_autumn", CONF_HISTORY_AUTUMN),
+                SEASON_WINTER: ("Vinterns ankomstdatum", "config_history_winter", CONF_HISTORY_WINTER),
+            }
+            for s in list(self._configured_seasons):
+                if s in stale_keys_map:
+                    attr_name, config_attr_name, conf_key = stale_keys_map[s]
+                    last_config_val = state.attributes.get(config_attr_name)
+                    current_config_val = config.get(conf_key)
+                    
+                    if last_config_val is not None and last_config_val == current_config_val:
+                        # The config hasn't changed since the state was saved!
+                        # Treat this as a reboot: restore dynamic arrival date from state.
+                        saved_date = state.attributes.get(attr_name)
+                        if saved_date is not None:
+                             self.arrival_dates[s] = saved_date
+                        self._configured_seasons.discard(s)
+
             # Restore Dates Logic
             for s in self.arrival_dates.keys():
                 if s in self._configured_seasons:
@@ -410,15 +458,17 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
                         self._manual_flags[s] = False
 
         # If we have a pending state write (from "set as current" checkbox), write it now
+        pending_write_done = False
         if self._pending_state_write:
             self._pending_state_write = False
+            pending_write_done = True
             self.async_write_ha_state()
             await self._log_info(
                 "Manually set current season to '%s' with arrival date %s",
                 self.current_season, self.season_arrival_date
             )
 
-        if self._sync_current_season_from_arrival_dates():
+        if not pending_write_done and self._sync_current_season_from_arrival_dates():
             self.async_write_ha_state()
             await self._log_info(
                 "Reconciled current season to '%s' from latest known arrival date %s.",
@@ -494,21 +544,31 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     async def _send_to_logbook(self, message, *args):
         """Format message and send to logbook service if log sensor is available."""
-        if self._log_sensor and self._log_sensor.hass and self._log_sensor.entity_id:
+        if self._log_sensor:
             try:
                 formatted_message = message % args
             except Exception:
                 formatted_message = message
             
             self._log_sensor.update_timestamp()
-            await self.hass.services.async_call(
-                "logbook", "log",
-                {
-                    "name": self._log_sensor.name,
-                    "message": formatted_message,
-                    "entity_id": self._log_sensor.entity_id,
-                }
-            )
+            
+            entity_id = self._log_sensor.entity_id
+            name = self._log_sensor.name
+            
+            # Fallback if log sensor is not yet fully initialized by HA
+            if not entity_id:
+                entity_id = self.entity_id
+                name = self.name
+                
+            if self.hass and entity_id:
+                await self.hass.services.async_call(
+                    "logbook", "log",
+                    {
+                        "name": name,
+                        "message": formatted_message,
+                        "entity_id": entity_id,
+                    }
+                )
 
     # --- Main Logic ---
 
