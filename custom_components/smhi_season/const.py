@@ -2,6 +2,7 @@
 
 DOMAIN = "smhi_season"
 CONF_TEMPERATURE_SENSOR = "temperature_sensor"
+CONF_ENABLE_DEBUG_ENTITIES = "enable_debug_entities"
 
 # Configuration constants for historical dates
 CONF_HISTORY_SPRING = "history_spring"

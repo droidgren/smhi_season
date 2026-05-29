@@ -7,7 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_ENABLE_DEBUG_ENTITIES
 from homeassistant.const import EntityCategory
 
 
@@ -17,6 +17,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the debug date entity."""
+    enable_debug = entry.options.get(CONF_ENABLE_DEBUG_ENTITIES, entry.data.get(CONF_ENABLE_DEBUG_ENTITIES, False))
+    if not enable_debug:
+        return
+
     date_entity = SmhiDebugDate(entry)
 
     if entry.entry_id in hass.data.get(DOMAIN, {}):
