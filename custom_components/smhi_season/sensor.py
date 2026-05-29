@@ -141,7 +141,8 @@ class SmhiLogSensor(SensorEntity):
     def update_timestamp(self):
         """Update the state to show when the last log happened."""
         self._attr_native_value = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.async_write_ha_state()
+        if self.hass is not None:
+            self.async_write_ha_state()
 
 
 class SmhiHistorySensor(RestoreSensor, SensorEntity):
