@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.37
+
+- **Fixed:** Daily mean temperature is now rounded to one decimal before the season criteria are evaluated, so a day shown as 0.0°C counts as a winter day (fixes #14 (https://github.com/droidgren/smhi_season/issues/14)).
+
 ## 1.36
 
 - **Added:** Debug entities (Date, Temp, and Step Day button) for simulating days and temperatures. This helps with testing algorithm logic without waiting for real-time days.

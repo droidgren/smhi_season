@@ -584,7 +584,7 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
 
     async def process_debug_step(self, debug_date, debug_temp):
         """Process a simulated day instead of reading recorder data."""
-        self.daily_avg_temp = float(debug_temp)
+        self.daily_avg_temp = round(float(debug_temp), 1)
         min_temp = self.daily_avg_temp # Assume same as average for testing
         
         if min_temp <= 0.0:
@@ -639,7 +639,9 @@ class SmhiSeasonSensor(RestoreSensor, SensorEntity):
             await self._log_warning("[%s] No temperature data found for yesterday for %s", yesterday.date(), self._temp_sensor_id)
             return
 
-        avg_temp = statistics.mean(temps)
+        # Round to one decimal (as SMHI does) so the thresholds are applied to
+        # the same value that is displayed, e.g. 0.03 -> 0.0 counts as a winter day.
+        avg_temp = round(statistics.mean(temps), 1)
         min_temp = min(temps)
         
         # Calculate days since frost
